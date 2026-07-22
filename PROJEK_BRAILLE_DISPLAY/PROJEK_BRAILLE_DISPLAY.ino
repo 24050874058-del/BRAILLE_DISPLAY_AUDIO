@@ -31,8 +31,8 @@
 // WIFI
 //======================================================
 
-const char* WIFI_SSID="NamaWifi";
-const char* WIFI_PASSWORD="PasswordWifi";
+String WIFI_SSID = "";
+String WIFI_PASSWORD = "";
 
 
 
@@ -209,6 +209,42 @@ void connectWiFi()
 
 }
 
+void inputWiFi()
+{
+    Serial.println();
+    Serial.println("================================");
+    Serial.println("      INPUT WIFI ESP32");
+    Serial.println("================================");
+
+    Serial.println("Masukkan SSID WiFi:");
+
+    while (Serial.available()) Serial.read();
+
+    while (!Serial.available())
+    {
+        delay(10);
+    }
+
+    WIFI_SSID = Serial.readStringUntil('\n');
+    WIFI_SSID.trim();
+
+    Serial.println(WIFI_SSID);
+
+    Serial.println("Masukkan Password:");
+
+    while (Serial.available()) Serial.read();
+
+    while (!Serial.available())
+    {
+        delay(10);
+    }
+
+    WIFI_PASSWORD = Serial.readStringUntil('\n');
+    WIFI_PASSWORD.trim();
+
+    Serial.println("Password diterima.");
+}
+
 
 
 //======================================================
@@ -268,37 +304,63 @@ void initLCD()
 // MCP
 //======================================================
 
+//======================================================
+// MCP23017
+//======================================================
+
 void initMCP()
 {
+    lcdCenter("Checking MCP...");
 
-    Wire.begin(
-        SDA_PIN,
-        SCL_PIN
-    );
+    Wire.begin(SDA_PIN, SCL_PIN);
 
-    if(!mcp1.begin_I2C(0x20))
+    bool mcp1OK = mcp1.begin_I2C(0x20);
+    bool mcp2OK = mcp2.begin_I2C(0x21);
+
+    if(mcp1OK)
+        Serial.println("MCP23017 #1 Ready");
+    else
+        Serial.println("MCP23017 #1 ERROR");
+
+    if(mcp2OK)
+        Serial.println("MCP23017 #2 Ready");
+    else
+        Serial.println("MCP23017 #2 ERROR");
+
+    if(mcp1OK && mcp2OK)
     {
-
-        Serial.println("MCP1 ERROR");
-
+        lcdCenter("MCP Ready");
+    }
+    else if(mcp1OK)
+    {
+        lcdCenter("MCP1 Ready");
+    }
+    else if(mcp2OK)
+    {
+        lcdCenter("MCP2 Ready");
+    }
+    else
+    {
+        lcdCenter("MCP ERROR");
     }
 
-    if(!mcp2.begin_I2C(0x21))
+    delay(1000);
+
+    if(mcp1OK)
     {
-
-        Serial.println("MCP2 ERROR");
-
+        for(int i=0; i<16; i++)
+        {
+            mcp1.pinMode(i, INPUT_PULLUP);
+        }
     }
 
-    for(int i=0;i<16;i++)
+    if(mcp2OK)
     {
-
-        mcp1.pinMode(i,INPUT_PULLUP);
-
-        mcp2.pinMode(i,INPUT_PULLUP);
-
+        for(int i=0; i<16; i++)
+        {
+            mcp2.pinMode(i, INPUT_PULLUP);
+        }
     }
-
 }
 
 
@@ -327,10 +389,13 @@ void initGPIO()
 
 void setup()
 {
-
     Serial.begin(115200);
 
+    while(!Serial);
+
     initLCD();
+
+    inputWiFi();
 
     connectWiFi();
 
@@ -341,7 +406,6 @@ void setup()
     initGPIO();
 
     lcdCenter("READY");
-
 }
 
 
