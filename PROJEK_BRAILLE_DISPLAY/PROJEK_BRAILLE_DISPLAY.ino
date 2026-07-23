@@ -251,8 +251,18 @@ void inputWiFi()
 // AUDIO
 //======================================================
 
+//======================================================
+// AUDIO PCM5102A
+//======================================================
+
 void initAudio()
 {
+    lcdCenter("Init Audio");
+
+    Serial.println();
+    Serial.println("================================");
+    Serial.println(" PCM5102A + PAM8403 ");
+    Serial.println("================================");
 
     audio.setPinout(
         I2S_BCLK,
@@ -262,9 +272,66 @@ void initAudio()
 
     audio.setVolume(18);
 
+    Serial.println("I2S Initialized");
+    Serial.print("BCLK : GPIO ");
+    Serial.println(I2S_BCLK);
+
+    Serial.print("LRCK : GPIO ");
+    Serial.println(I2S_LRC);
+
+    Serial.print("DATA : GPIO ");
+    Serial.println(I2S_DOUT);
+
+    lcdCenter("Audio Ready");
+
+    delay(1000);
 }
 
+//======================================================
+// TEST AUDIO
+//======================================================
 
+void testAudio()
+{
+    lcdCenter("Testing Audio");
+
+    Serial.println();
+    Serial.println("===== AUDIO TEST =====");
+
+    if(WiFi.status()!=WL_CONNECTED)
+    {
+        Serial.println("WiFi NOT Connected");
+        lcdCenter("No WiFi");
+        delay(1000);
+        return;
+    }
+
+    Serial.println("Sending Google TTS...");
+
+    audio.connecttospeech("Tes suara berhasil", "id");
+
+    unsigned long timeout = millis();
+
+    while(audio.isRunning())
+    {
+        audio.loop();
+
+        if(millis()-timeout>15000)
+        {
+            Serial.println("Audio Timeout");
+
+            audio.stopSong();
+
+            break;
+        }
+    }
+
+    Serial.println("Audio Test Finished");
+
+    lcdCenter("Audio OK");
+
+    delay(1000);
+}
 
 //======================================================
 // LCD
@@ -381,6 +448,61 @@ void initGPIO()
 
 }
 
+//======================================================
+// SERIAL MENU
+//======================================================
+
+void serialMenu()
+{
+    if(!Serial.available())
+        return;
+
+    char cmd = Serial.read();
+
+    switch(cmd)
+    {
+        case '1':
+
+            testAudio();
+
+            break;
+
+        case '2':
+
+            Serial.println();
+            Serial.println("========== STATUS ==========");
+
+            if(WiFi.status()==WL_CONNECTED)
+            {
+                Serial.println("WiFi        : Connected");
+                Serial.print("IP Address  : ");
+                Serial.println(WiFi.localIP());
+            }
+            else
+            {
+                Serial.println("WiFi        : Disconnected");
+            }
+
+            Serial.println("LCD         : OK");
+            Serial.println("PCM5102A    : I2S Initialized");
+            Serial.println("PAM8403     : Connected");
+            Serial.println("MCP23017 #1 : Ready");
+            Serial.println("MCP23017 #2 : Ready");
+
+            Serial.println("============================");
+
+            break;
+
+        case '3':
+
+            Serial.println();
+            Serial.println("Playing Test Voice...");
+
+            audio.connecttospeech("Selamat datang pada alat braille elektronik", "id");
+
+            break;
+    }
+}
 
 
 //======================================================
@@ -400,6 +522,8 @@ void setup()
     connectWiFi();
 
     initAudio();
+
+    testAudio();
 
     initMCP();
 
