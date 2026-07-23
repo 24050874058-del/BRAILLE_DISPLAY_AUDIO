@@ -333,6 +333,36 @@ void testAudio()
     delay(1000);
 }
 
+void speak(String text)
+{
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println("TTS gagal, WiFi belum terhubung.");
+        return;
+    }
+
+    Serial.print("TTS : ");
+    Serial.println(text);
+
+    audio.connecttospeech(text.c_str(), "id");
+
+    unsigned long timeout = millis();
+
+    while (audio.isRunning())
+    {
+        audio.loop();
+
+        if (millis() - timeout > 15000)
+        {
+            Serial.println("TTS Timeout");
+            audio.stopSong();
+            break;
+        }
+    }
+
+    Serial.println("TTS Selesai");
+}
+
 //======================================================
 // LCD
 //======================================================
@@ -530,6 +560,7 @@ void setup()
     initGPIO();
 
     lcdCenter("READY");
+    speak("Ready");
 }
 
 
