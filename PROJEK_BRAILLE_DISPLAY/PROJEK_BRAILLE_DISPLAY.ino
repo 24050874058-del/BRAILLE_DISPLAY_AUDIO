@@ -6,7 +6,7 @@
  * --------
  * ESP32-S3 N16R8
  * TFT ST7796S SPI
- * 2x MCP23017
+ * MCP23017
  * MAX98357A
 
 
@@ -80,7 +80,6 @@ Audio audio;
 //======================================================
 
 Adafruit_MCP23X17 mcp1;
-Adafruit_MCP23X17 mcp2;
 
 
 
@@ -101,20 +100,64 @@ const uint8_t extraGPIO[6]=
 
 
 //======================================================
-// CHARACTER MAP
+// BRAILLE STATE & LOGIC
 //======================================================
 
-const char charMap[]=
-{
-'1','2','3','4','5','6','7','8','9','0',
-'A','B','C','D','V','E',
-'F','G','H','I','J','K','L','M',
-'N','O','P','Q','R','S','T','U',
-'W','X','Y','Z',
-'+','='
-};
+uint8_t currentPattern = 0;
+uint8_t currentMode = 0; // 0=Huruf, 1=Angka, 2=Kata
+String currentWord = "";
 
-const uint8_t TOTAL_BUTTON=38;
+uint16_t lastButtonState = 0xFFFF; // MCP23017 is pulled high
+uint16_t lastFlickerState = 0xFFFF;
+unsigned long lastDebounceTime = 0;
+
+char decodeBraille(uint8_t pattern, bool isNumber) {
+    if (isNumber) {
+        switch(pattern) {
+            case 0b000001: return '1';
+            case 0b000011: return '2';
+            case 0b001001: return '3';
+            case 0b011001: return '4';
+            case 0b010001: return '5';
+            case 0b001011: return '6';
+            case 0b011011: return '7';
+            case 0b010011: return '8';
+            case 0b001010: return '9';
+            case 0b011010: return '0';
+            default: return '?';
+        }
+    } else {
+        switch(pattern) {
+            case 0b000001: return 'a';
+            case 0b000011: return 'b';
+            case 0b001001: return 'c';
+            case 0b011001: return 'd';
+            case 0b010001: return 'e';
+            case 0b001011: return 'f';
+            case 0b011011: return 'g';
+            case 0b010011: return 'h';
+            case 0b001010: return 'i';
+            case 0b011010: return 'j';
+            case 0b000101: return 'k';
+            case 0b000111: return 'l';
+            case 0b001101: return 'm';
+            case 0b011101: return 'n';
+            case 0b010101: return 'o';
+            case 0b001111: return 'p';
+            case 0b011111: return 'q';
+            case 0b010111: return 'r';
+            case 0b001110: return 's';
+            case 0b011110: return 't';
+            case 0b100101: return 'u';
+            case 0b100111: return 'v';
+            case 0b111010: return 'w';
+            case 0b101101: return 'x';
+            case 0b111101: return 'y';
+            case 0b110101: return 'z';
+            default: return '?';
+        }
+    }
+}
 
 
 
@@ -170,8 +213,6 @@ void lcdCenter(String txt)
 
 bool connectWiFi()
 {
-    lcdCenter("Connecting WiFi");
-
     WiFi.disconnect(true);
     delay(500);
 
@@ -182,7 +223,11 @@ bool connectWiFi()
     Serial.print(WIFI_SSID);
     Serial.println("]");
 
-    WiFi.begin(WIFI_SSID.c_str(), WIFI_PASSWORD.c_str());
+    if (WIFI_PASSWORD.length() == 0 || WIFI_PASSWORD == "-") {
+        WiFi.begin(WIFI_SSID.c_str());
+    } else {
+        WiFi.begin(WIFI_SSID.c_str(), WIFI_PASSWORD.c_str());
+    }
 
     unsigned long t = millis();
 
@@ -191,7 +236,7 @@ bool connectWiFi()
         delay(500);
         Serial.print(".");
 
-        if(millis() - t > 15000)
+        if(millis() - t > 20000)
         {
             Serial.println();
             Serial.print("WiFi Failed! Status Code: ");
@@ -203,7 +248,6 @@ bool connectWiFi()
                 Serial.println("-> Keterangan: SSID Tidak Ditemukan (WL_NO_SSID_AVAIL)");
             }
 
-            lcdCenter("WiFi Failed");
             return false;
         }
     }
@@ -212,7 +256,6 @@ bool connectWiFi()
     Serial.print("WiFi Connected! IP Address: ");
     Serial.println(WiFi.localIP());
 
-    lcdCenter("WiFi Connected");
     return true;
 }
 
@@ -247,7 +290,9 @@ void inputWiFi()
     WIFI_PASSWORD.replace("\r", "");
     WIFI_PASSWORD.trim();
 
-    Serial.print("Password Diterima (Panjang: ");
+    Serial.print("Password Diterima: [");
+    Serial.print(WIFI_PASSWORD);
+    Serial.print("] (Panjang: ");
     Serial.print(WIFI_PASSWORD.length());
     Serial.println(" karakter).");
 }
@@ -264,8 +309,6 @@ void inputWiFi()
 
 void initAudio()
 {
-    lcdCenter("Init Audio");
-
     Serial.println();
     Serial.println("================================");
     Serial.println(" PCM5102A + PAM8403 ");
@@ -289,8 +332,6 @@ void initAudio()
     Serial.print("DATA : GPIO ");
     Serial.println(I2S_DOUT);
 
-    lcdCenter("Audio Ready");
-
     delay(1000);
 }
 
@@ -300,8 +341,6 @@ void initAudio()
 
 void testAudio()
 {
-    lcdCenter("Testing Audio");
-
     Serial.println();
     Serial.println("===== AUDIO TEST =====");
 
@@ -310,12 +349,11 @@ void testAudio()
     audio.connecttohost("http://www.soundjay.com/button/button-1.wav"); // Jika ingin tes file online
     
     // Atau bunyikan sinyal nada test internal
-    audio.setVolume(12); // Tingkatkan volume ke 21 (maks 21)
+    audio.setVolume(21); // Tingkatkan volume ke 21 (maks 21)
 
     if(WiFi.status()!=WL_CONNECTED)
     {
         Serial.println("WiFi NOT Connected");
-        lcdCenter("No WiFi");
         delay(1000);
         return;
     }
@@ -341,8 +379,6 @@ void testAudio()
     }
 
     Serial.println("Audio Test Finished");
-
-    lcdCenter("Audio OK");
 
     delay(1000);
 }
@@ -391,39 +427,16 @@ void initLCD()
 
 void initMCP()
 {
-    lcdCenter("Checking MCP...");
+    Serial.println("Checking MCP...");
 
     Wire.begin(SDA_PIN, SCL_PIN);
 
     bool mcp1OK = mcp1.begin_I2C(0x20);
-    bool mcp2OK = mcp2.begin_I2C(0x21);
 
     if(mcp1OK)
-        Serial.println("MCP23017 #1 Ready");
+        Serial.println("MCP23017 Ready");
     else
-        Serial.println("MCP23017 #1 ERROR");
-
-    if(mcp2OK)
-        Serial.println("MCP23017 #2 Ready");
-    else
-        Serial.println("MCP23017 #2 ERROR");
-
-    if(mcp1OK && mcp2OK)
-    {
-        lcdCenter("MCP Ready");
-    }
-    else if(mcp1OK)
-    {
-        lcdCenter("MCP1 Ready");
-    }
-    else if(mcp2OK)
-    {
-        lcdCenter("MCP2 Ready");
-    }
-    else
-    {
-        lcdCenter("MCP ERROR");
-    }
+        Serial.println("MCP23017 ERROR");
 
     delay(1000);
 
@@ -432,14 +445,6 @@ void initMCP()
         for(int i=0; i<16; i++)
         {
             mcp1.pinMode(i, INPUT_PULLUP);
-        }
-    }
-
-    if(mcp2OK)
-    {
-        for(int i=0; i<16; i++)
-        {
-            mcp2.pinMode(i, INPUT_PULLUP);
         }
     }
 }
@@ -473,16 +478,33 @@ void serialMenu()
 
     char cmd = Serial.read();
 
+    // Abaikan enter/newline
+    if (cmd == '\n' || cmd == '\r') return;
+
     switch(cmd)
     {
-        case '1':
+        // --- SIMULASI TOMBOL BRAILLE ---
+        case '1': handleButtonPress(0); break; // Titik 1
+        case '2': handleButtonPress(1); break; // Titik 2
+        case '3': handleButtonPress(2); break; // Titik 3
+        case '4': handleButtonPress(3); break; // Titik 4
+        case '5': handleButtonPress(4); break; // Titik 5
+        case '6': handleButtonPress(5); break; // Titik 6
+        case 'e': 
+        case 'E': handleButtonPress(6); break; // ENTER
+        case 's': 
+        case 'S': handleButtonPress(7); break; // SPASI
+        case 'x': 
+        case 'X': handleButtonPress(8); break; // HAPUS
+        case 'm': 
+        case 'M': handleButtonPress(9); break; // GANTI MODE
 
+        // --- MENU DEBUGGING LAMA ---
+        case '!':
             testAudio();
-
             break;
 
-        case '2':
-
+        case '@':
             Serial.println();
             Serial.println("========== STATUS ==========");
 
@@ -500,20 +522,15 @@ void serialMenu()
             Serial.println("LCD         : OK");
             Serial.println("PCM5102A    : I2S Initialized");
             Serial.println("PAM8403     : Connected");
-            Serial.println("MCP23017 #1 : Ready");
-            Serial.println("MCP23017 #2 : Ready");
+            Serial.println("MCP23017    : Ready");
 
             Serial.println("============================");
-
             break;
 
-        case '3':
-
+        case '#':
             Serial.println();
             Serial.println("Playing Test Voice...");
-
             audio.connecttospeech("Selamat datang pada alat braille elektronik", "id");
-
             break;
     }
 }
@@ -553,10 +570,116 @@ void setup()
 
     initGPIO();
 
-    lcdCenter("READY");
+    lcdCenter("Siap Digunakan");
 }
 
 
+
+//======================================================
+// BUTTON LOGIC
+//======================================================
+
+void handleButtonPress(int pin) {
+    if (pin >= 0 && pin <= 5) {
+        // Titik 1-6 ditekan
+        currentPattern ^= (1 << pin); // Toggle titik
+        Serial.print("Titik ");
+        Serial.print(pin + 1);
+        if (currentPattern & (1 << pin)) Serial.println(" AKTIF");
+        else Serial.println(" MATI");
+    }
+    else if (pin == 6) {
+        // ENTER
+        if (currentPattern == 0) return;
+
+        char c = decodeBraille(currentPattern, (currentMode == 1));
+        
+        if (c == '?') {
+            Serial.println("Pola salah!");
+            audio.connecttospeech("Pola salah", "id");
+        } else {
+            Serial.print("Karakter Terbaca: ");
+            Serial.println(c);
+            
+            if (currentMode == 0 || currentMode == 1) {
+                String toSpeak = String(c);
+                audio.connecttospeech(toSpeak.c_str(), "id");
+            } 
+            else if (currentMode == 2) {
+                currentWord += c;
+                Serial.print("Kata saat ini: ");
+                Serial.println(currentWord);
+                String toSpeak = String(c);
+                audio.connecttospeech(toSpeak.c_str(), "id");
+            }
+        }
+        currentPattern = 0; // Reset pola setelah enter
+    }
+    else if (pin == 7) {
+        // SPASI (khusus mode kata)
+        if (currentMode == 2) {
+            Serial.print("Spasi! Membaca kata: ");
+            Serial.println(currentWord);
+            if (currentWord.length() > 0) {
+                audio.connecttospeech(currentWord.c_str(), "id");
+                currentWord = ""; 
+            }
+        } else {
+            Serial.println("Spasi hanya untuk mode kata.");
+        }
+    }
+    else if (pin == 8) {
+        // HAPUS (Backspace)
+        if (currentMode == 2 && currentWord.length() > 0) {
+            currentWord.remove(currentWord.length() - 1);
+            Serial.print("Hapus 1 huruf. Kata saat ini: ");
+            Serial.println(currentWord);
+            audio.connecttospeech("Hapus", "id");
+        }
+        currentPattern = 0; 
+    }
+    else if (pin == 9) {
+        // GANTI MODE
+        currentMode++;
+        if (currentMode > 2) currentMode = 0;
+        
+        currentPattern = 0;
+        currentWord = "";
+        
+        if (currentMode == 0) {
+            Serial.println("MODE HURUF");
+            audio.connecttospeech("Mode Huruf", "id");
+        } else if (currentMode == 1) {
+            Serial.println("MODE ANGKA");
+            audio.connecttospeech("Mode Angka", "id");
+        } else if (currentMode == 2) {
+            Serial.println("MODE KATA");
+            audio.connecttospeech("Mode Kata", "id");
+        }
+    }
+}
+
+void checkButtons() {
+    uint16_t readState = mcp1.readGPIOAB();
+    
+    if (readState != lastFlickerState) {
+        lastDebounceTime = millis();
+        lastFlickerState = readState;
+    }
+
+    if ((millis() - lastDebounceTime) > 50) {
+        if (readState != lastButtonState) {
+            for (int i = 0; i < 10; i++) {
+                bool isPressed = !(readState & (1 << i));
+                bool wasPressed = !(lastButtonState & (1 << i));
+                if (isPressed && !wasPressed) {
+                    handleButtonPress(i);
+                }
+            }
+            lastButtonState = readState;
+        }
+    }
+}
 
 //======================================================
 // LOOP
@@ -564,7 +687,7 @@ void setup()
 
 void loop()
 {
-
     audio.loop();
-
+    checkButtons();
+    serialMenu();
 }
