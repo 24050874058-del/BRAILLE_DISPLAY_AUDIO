@@ -168,45 +168,52 @@ void lcdCenter(String txt)
 // WIFI
 //======================================================
 
-void connectWiFi()
+bool connectWiFi()
 {
-
     lcdCenter("Connecting WiFi");
 
+    WiFi.disconnect(true);
+    delay(500);
+
     WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
 
-    WiFi.begin(WIFI_SSID,WIFI_PASSWORD);
+    Serial.print("Mencoba menghubungkan ke: [");
+    Serial.print(WIFI_SSID);
+    Serial.println("]");
 
-    unsigned long t=millis();
+    WiFi.begin(WIFI_SSID.c_str(), WIFI_PASSWORD.c_str());
 
-    while(WiFi.status()!=WL_CONNECTED)
+    unsigned long t = millis();
+
+    while(WiFi.status() != WL_CONNECTED)
     {
-
-        delay(300);
-
+        delay(500);
         Serial.print(".");
 
-        if(millis()-t>20000)
+        if(millis() - t > 15000)
         {
-
             Serial.println();
+            Serial.print("WiFi Failed! Status Code: ");
+            Serial.println(WiFi.status());
 
-            Serial.println("WiFi Failed");
+            if (WiFi.status() == 6) {
+                Serial.println("-> Keterangan: Password Salah / Terputus (WL_CONNECT_FAILED)");
+            } else if (WiFi.status() == 1) {
+                Serial.println("-> Keterangan: SSID Tidak Ditemukan (WL_NO_SSID_AVAIL)");
+            }
 
             lcdCenter("WiFi Failed");
-
-            return;
-
+            return false;
         }
-
     }
 
     Serial.println();
-
+    Serial.print("WiFi Connected! IP Address: ");
     Serial.println(WiFi.localIP());
 
     lcdCenter("WiFi Connected");
-
+    return true;
 }
 
 void inputWiFi()
@@ -216,33 +223,33 @@ void inputWiFi()
     Serial.println("      INPUT WIFI ESP32");
     Serial.println("================================");
 
+    // Flus/kosongkan sisa masukan serial sebelumnya
+    while (Serial.available()) { Serial.read(); delay(2); }
+
     Serial.println("Masukkan SSID WiFi:");
-
-    while (Serial.available()) Serial.read();
-
-    while (!Serial.available())
-    {
-        delay(10);
-    }
+    while (!Serial.available()) { delay(10); }
 
     WIFI_SSID = Serial.readStringUntil('\n');
+    WIFI_SSID.replace("\r", "");
     WIFI_SSID.trim();
 
-    Serial.println(WIFI_SSID);
+    Serial.print("SSID Diterima: [");
+    Serial.print(WIFI_SSID);
+    Serial.println("]");
+
+    // Flus/kosongkan sisa masukan serial
+    while (Serial.available()) { Serial.read(); delay(2); }
 
     Serial.println("Masukkan Password:");
-
-    while (Serial.available()) Serial.read();
-
-    while (!Serial.available())
-    {
-        delay(10);
-    }
+    while (!Serial.available()) { delay(10); }
 
     WIFI_PASSWORD = Serial.readStringUntil('\n');
+    WIFI_PASSWORD.replace("\r", "");
     WIFI_PASSWORD.trim();
 
-    Serial.println("Password diterima.");
+    Serial.print("Password Diterima (Panjang: ");
+    Serial.print(WIFI_PASSWORD.length());
+    Serial.println(" karakter).");
 }
 
 
@@ -270,7 +277,7 @@ void initAudio()
         I2S_DOUT
     );
 
-    audio.setVolume(18);
+    audio.setVolume(100);
 
     Serial.println("I2S Initialized");
     Serial.print("BCLK : GPIO ");
@@ -298,6 +305,13 @@ void testAudio()
     Serial.println();
     Serial.println("===== AUDIO TEST =====");
 
+    // 1. Tes Nada Bip Lokal (Murni I2S Hardware Check)
+    Serial.println("Memulai Tes Suara Lokal (Bip Hardware I2S)...");
+    audio.connecttohost("http://www.soundjay.com/button/button-1.wav"); // Jika ingin tes file online
+    
+    // Atau bunyikan sinyal nada test internal
+    audio.setVolume(12); // Tingkatkan volume ke 21 (maks 21)
+
     if(WiFi.status()!=WL_CONNECTED)
     {
         Serial.println("WiFi NOT Connected");
@@ -308,7 +322,7 @@ void testAudio()
 
     Serial.println("Sending Google TTS...");
 
-    audio.connecttospeech("Tes suara berhasil", "id");
+    audio.connecttospeech("Braiile ready", "id");
 
     unsigned long timeout = millis();
 
@@ -331,36 +345,6 @@ void testAudio()
     lcdCenter("Audio OK");
 
     delay(1000);
-}
-
-void speak(String text)
-{
-    if (WiFi.status() != WL_CONNECTED)
-    {
-        Serial.println("TTS gagal, WiFi belum terhubung.");
-        return;
-    }
-
-    Serial.print("TTS : ");
-    Serial.println(text);
-
-    audio.connecttospeech(text.c_str(), "id");
-
-    unsigned long timeout = millis();
-
-    while (audio.isRunning())
-    {
-        audio.loop();
-
-        if (millis() - timeout > 15000)
-        {
-            Serial.println("TTS Timeout");
-            audio.stopSong();
-            break;
-        }
-    }
-
-    Serial.println("TTS Selesai");
 }
 
 //======================================================
@@ -545,11 +529,21 @@ void setup()
 
     while(!Serial);
 
+    delay(100);
+
     initLCD();
 
-    inputWiFi();
-
-    connectWiFi();
+    // Loop input & koneksi WiFi sampai berhasil
+    while (true)
+    {
+        inputWiFi();
+        if (connectWiFi())
+        {
+            break; // Jika terkoneksi, keluar dari loop
+        }
+        Serial.println("\n[!] WiFi Gagal Terkoneksi. Silakan masukkan SSID & Password kembali.");
+        delay(1000);
+    }
 
     initAudio();
 
@@ -560,7 +554,6 @@ void setup()
     initGPIO();
 
     lcdCenter("READY");
-    speak("Ready");
 }
 
 
