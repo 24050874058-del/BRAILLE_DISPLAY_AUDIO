@@ -8,14 +8,18 @@
  * TFT ST7796S SPI
  * MCP23017
  * MAX98357A
-
-
- tesssssss
+ *
+ * WiFi:
+ *   - Kredensial disimpan di EEPROM
+ *   - Auto-konek saat boot (seperti HP/Laptop)
+ *   - Jika jaringan tidak ada, lanjut tanpa WiFi
+ *   - Serial: ketik 'W' untuk ganti WiFi, 'CLR' untuk hapus kredensial
  **************************************************************************/
 
 #include <WiFi.h>
 #include <Wire.h>
 #include <SPI.h>
+#include <EEPROM.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7796S.h>
@@ -24,6 +28,76 @@
 #include <Adafruit_MCP23X17.h>
 
 #include "Audio.h"
+
+
+
+//======================================================
+// EEPROM
+//======================================================
+
+// Layout EEPROM:
+//   [0]       : magic byte (0xAB = ada data tersimpan)
+//   [1..65]   : SSID (64 karakter + null terminator)
+//   [66..130] : Password (64 karakter + null terminator)
+#define EEPROM_SIZE         131
+#define EEPROM_MAGIC_ADDR   0
+#define EEPROM_SSID_ADDR    1
+#define EEPROM_PASS_ADDR    66
+#define EEPROM_MAX_LEN      64
+#define EEPROM_MAGIC_VAL    0xAB
+
+void eepromSaveWiFi(const String &ssid, const String &pass)
+{
+    // Tulis magic byte
+    EEPROM.write(EEPROM_MAGIC_ADDR, EEPROM_MAGIC_VAL);
+
+    // Tulis SSID
+    int lenSSID = min((int)ssid.length(), EEPROM_MAX_LEN);
+    for (int i = 0; i < lenSSID; i++)
+        EEPROM.write(EEPROM_SSID_ADDR + i, ssid[i]);
+    EEPROM.write(EEPROM_SSID_ADDR + lenSSID, 0); // null terminator
+
+    // Tulis Password
+    int lenPass = min((int)pass.length(), EEPROM_MAX_LEN);
+    for (int i = 0; i < lenPass; i++)
+        EEPROM.write(EEPROM_PASS_ADDR + i, pass[i]);
+    EEPROM.write(EEPROM_PASS_ADDR + lenPass, 0); // null terminator
+
+    EEPROM.commit();
+
+    Serial.println("[EEPROM] Kredensial WiFi disimpan.");
+}
+
+bool eepromLoadWiFi(String &ssid, String &pass)
+{
+    if (EEPROM.read(EEPROM_MAGIC_ADDR) != EEPROM_MAGIC_VAL)
+        return false; // Tidak ada data tersimpan
+
+    // Baca SSID
+    ssid = "";
+    for (int i = 0; i < EEPROM_MAX_LEN; i++) {
+        char c = (char)EEPROM.read(EEPROM_SSID_ADDR + i);
+        if (c == 0) break;
+        ssid += c;
+    }
+
+    // Baca Password
+    pass = "";
+    for (int i = 0; i < EEPROM_MAX_LEN; i++) {
+        char c = (char)EEPROM.read(EEPROM_PASS_ADDR + i);
+        if (c == 0) break;
+        pass += c;
+    }
+
+    return (ssid.length() > 0);
+}
+
+void eepromClearWiFi()
+{
+    EEPROM.write(EEPROM_MAGIC_ADDR, 0x00); // Hapus magic byte
+    EEPROM.commit();
+    Serial.println("[EEPROM] Kredensial WiFi dihapus.");
+}
 
 
 
@@ -211,7 +285,8 @@ void lcdCenter(String txt)
 // WIFI
 //======================================================
 
-bool connectWiFi()
+// Coba konek WiFi dengan timeout, return true jika berhasil
+bool connectWiFi(unsigned long timeoutMs = 20000)
 {
     WiFi.disconnect(true);
     delay(500);
@@ -231,23 +306,23 @@ bool connectWiFi()
 
     unsigned long t = millis();
 
-    while(WiFi.status() != WL_CONNECTED)
+    while (WiFi.status() != WL_CONNECTED)
     {
         delay(500);
         Serial.print(".");
 
-        if(millis() - t > 20000)
+        if (millis() - t > timeoutMs)
         {
             Serial.println();
-            Serial.print("WiFi Failed! Status Code: ");
+            Serial.print("WiFi Gagal! Status Code: ");
             Serial.println(WiFi.status());
 
-            if (WiFi.status() == 6) {
-                Serial.println("-> Keterangan: Password Salah / Terputus (WL_CONNECT_FAILED)");
-            } else if (WiFi.status() == 1) {
-                Serial.println("-> Keterangan: SSID Tidak Ditemukan (WL_NO_SSID_AVAIL)");
-            }
+            if (WiFi.status() == WL_CONNECT_FAILED)
+                Serial.println("-> Password Salah (WL_CONNECT_FAILED)");
+            else if (WiFi.status() == WL_NO_SSID_AVAIL)
+                Serial.println("-> SSID Tidak Ditemukan (WL_NO_SSID_AVAIL)");
 
+            WiFi.disconnect(true);
             return false;
         }
     }
@@ -259,6 +334,35 @@ bool connectWiFi()
     return true;
 }
 
+// Auto-konek dari EEPROM (seperti HP/Laptop)
+// Return: true jika berhasil konek, false jika tidak ada data / jaringan tidak tersedia
+bool autoConnectWiFi()
+{
+    String ssid, pass;
+
+    if (!eepromLoadWiFi(ssid, pass)) {
+        Serial.println("[WiFi] Tidak ada kredensial tersimpan di EEPROM.");
+        return false;
+    }
+
+    Serial.println("[WiFi] Kredensial ditemukan di EEPROM:");
+    Serial.print("  SSID : "); Serial.println(ssid);
+    Serial.println("  Pass : ****");
+    Serial.println("[WiFi] Mencoba auto-konek...");
+
+    WIFI_SSID = ssid;
+    WIFI_PASSWORD = pass;
+
+    // Timeout 15 detik untuk auto-konek (agar boot tidak terlalu lama)
+    if (connectWiFi(15000)) {
+        Serial.println("[WiFi] Auto-konek berhasil!");
+        return true;
+    } else {
+        Serial.println("[WiFi] Jaringan tidak tersedia. Melanjutkan tanpa WiFi.");
+        return false;
+    }
+}
+
 void inputWiFi()
 {
     Serial.println();
@@ -266,7 +370,7 @@ void inputWiFi()
     Serial.println("      INPUT WIFI ESP32");
     Serial.println("================================");
 
-    // Flus/kosongkan sisa masukan serial sebelumnya
+    // Kosongkan sisa masukan serial sebelumnya
     while (Serial.available()) { Serial.read(); delay(2); }
 
     Serial.println("Masukkan SSID WiFi:");
@@ -276,14 +380,12 @@ void inputWiFi()
     WIFI_SSID.replace("\r", "");
     WIFI_SSID.trim();
 
-    Serial.print("SSID Diterima: [");
-    Serial.print(WIFI_SSID);
-    Serial.println("]");
+    Serial.print("SSID Diterima: ["); Serial.print(WIFI_SSID); Serial.println("]");
 
-    // Flus/kosongkan sisa masukan serial
+    // Kosongkan sisa masukan serial
     while (Serial.available()) { Serial.read(); delay(2); }
 
-    Serial.println("Masukkan Password:");
+    Serial.println("Masukkan Password (kosongkan jika open network):");
     while (!Serial.available()) { delay(10); }
 
     WIFI_PASSWORD = Serial.readStringUntil('\n');
@@ -295,6 +397,14 @@ void inputWiFi()
     Serial.print("] (Panjang: ");
     Serial.print(WIFI_PASSWORD.length());
     Serial.println(" karakter).");
+
+    // Coba konek; jika berhasil, simpan ke EEPROM
+    if (connectWiFi(20000)) {
+        eepromSaveWiFi(WIFI_SSID, WIFI_PASSWORD);
+        Serial.println("[WiFi] Kredensial disimpan ke EEPROM.");
+    } else {
+        Serial.println("[WiFi] Koneksi gagal. Kredensial tidak disimpan.");
+    }
 }
 
 
@@ -344,23 +454,19 @@ void testAudio()
     Serial.println();
     Serial.println("===== AUDIO TEST =====");
 
-    // 1. Tes Nada Bip Lokal (Murni I2S Hardware Check)
-    Serial.println("Memulai Tes Suara Lokal (Bip Hardware I2S)...");
-    audio.connecttohost("http://www.soundjay.com/button/button-1.wav"); // Jika ingin tes file online
-    
-    // Atau bunyikan sinyal nada test internal
-    audio.setVolume(21); // Tingkatkan volume ke 21 (maks 21)
-
-    if(WiFi.status()!=WL_CONNECTED)
+    // Jika WiFi tidak tersambung, skip test audio (hindari crash FreeRTOS)
+    if (WiFi.status() != WL_CONNECTED)
     {
-        Serial.println("WiFi NOT Connected");
+        Serial.println("WiFi NOT Connected - Audio test dilewati.");
         delay(1000);
         return;
     }
 
+    audio.setVolume(21); // Tingkatkan volume ke 21 (maks 21)
+
     Serial.println("Sending Google TTS...");
 
-    audio.connecttospeech("Braiile ready", "id");
+    audio.connecttospeech("Braille ready", "id");
 
     unsigned long timeout = millis();
 
@@ -499,39 +605,74 @@ void serialMenu()
         case 'm': 
         case 'M': handleButtonPress(9); break; // GANTI MODE
 
-        // --- MENU DEBUGGING LAMA ---
+        // --- MENU DEBUGGING ---
         case '!':
             testAudio();
             break;
 
         case '@':
+        {
             Serial.println();
             Serial.println("========== STATUS ==========");
 
-            if(WiFi.status()==WL_CONNECTED)
-            {
+            if (WiFi.status() == WL_CONNECTED) {
                 Serial.println("WiFi        : Connected");
-                Serial.print("IP Address  : ");
-                Serial.println(WiFi.localIP());
-            }
-            else
-            {
+                Serial.print("SSID        : "); Serial.println(WIFI_SSID);
+                Serial.print("IP Address  : "); Serial.println(WiFi.localIP());
+            } else {
                 Serial.println("WiFi        : Disconnected");
+            }
+
+            // Tampilkan info EEPROM
+            String savedSSID, savedPass;
+            if (eepromLoadWiFi(savedSSID, savedPass)) {
+                Serial.print("EEPROM SSID : "); Serial.println(savedSSID);
+            } else {
+                Serial.println("EEPROM SSID : (kosong)");
             }
 
             Serial.println("LCD         : OK");
             Serial.println("PCM5102A    : I2S Initialized");
             Serial.println("PAM8403     : Connected");
             Serial.println("MCP23017    : Ready");
-
             Serial.println("============================");
             break;
+        }
 
         case '#':
             Serial.println();
             Serial.println("Playing Test Voice...");
             audio.connecttospeech("Selamat datang pada alat braille elektronik", "id");
             break;
+
+        case 'W':
+        case 'w':
+            // Input WiFi baru & simpan ke EEPROM jika berhasil
+            inputWiFi();
+            break;
+
+        case 'C':
+        case 'c':
+        {
+            // Cek apakah perintah "CLR"
+            delay(50); // beri waktu karakter berikutnya masuk
+            String rest = "";
+            while (Serial.available()) {
+                char ch = Serial.read();
+                if (ch == '\n' || ch == '\r') break;
+                rest += ch;
+                delay(2);
+            }
+            rest.toUpperCase();
+            if (rest == "LR") {
+                eepromClearWiFi();
+                WIFI_SSID = "";
+                WIFI_PASSWORD = "";
+            } else {
+                Serial.println("Perintah tidak dikenal. Maksud Anda 'CLR'?");
+            }
+            break;
+        }
     }
 }
 
@@ -544,22 +685,27 @@ void setup()
 {
     Serial.begin(115200);
 
-    while(!Serial);
+    while (!Serial);
 
     delay(100);
 
+    // Inisialisasi EEPROM
+    EEPROM.begin(EEPROM_SIZE);
+
     initLCD();
 
-    // Loop input & koneksi WiFi sampai berhasil
-    while (true)
-    {
-        inputWiFi();
-        if (connectWiFi())
-        {
-            break; // Jika terkoneksi, keluar dari loop
-        }
-        Serial.println("\n[!] WiFi Gagal Terkoneksi. Silakan masukkan SSID & Password kembali.");
-        delay(1000);
+    // --- Auto-konek WiFi dari EEPROM (seperti HP/Laptop) ---
+    Serial.println();
+    Serial.println("================================");
+    Serial.println("    AUTO-CONNECT WIFI");
+    Serial.println("================================");
+
+    bool wifiOK = autoConnectWiFi();
+
+    if (!wifiOK) {
+        Serial.println();
+        Serial.println("[WiFi] Melewati koneksi WiFi. Ketik 'W' di Serial Monitor");
+        Serial.println("       untuk memasukkan kredensial WiFi baru.");
     }
 
     initAudio();
@@ -571,6 +717,14 @@ void setup()
     initGPIO();
 
     lcdCenter("Siap Digunakan");
+
+    Serial.println();
+    Serial.println("======= PERINTAH SERIAL =======");
+    Serial.println(" W   = Input WiFi baru");
+    Serial.println(" CLR = Hapus kredensial WiFi");
+    Serial.println(" @   = Status perangkat");
+    Serial.println(" !   = Test audio");
+    Serial.println("===============================");
 }
 
 
