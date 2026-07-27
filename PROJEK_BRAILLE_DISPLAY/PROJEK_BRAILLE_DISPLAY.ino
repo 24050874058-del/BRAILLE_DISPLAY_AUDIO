@@ -874,25 +874,158 @@ bool autoConnectWiFi() {
 // SERIAL MENU
 // ============================================================
 void inputWiFiSerial() {
-    Serial.println("\n----- INPUT WIFI (SERIAL) -----");
+    Serial.println("\n========== INPUT WIFI (SERIAL) ==========");
+    Serial.println("Sama seperti di layar sentuh (UI).");
+    Serial.println("Ketik SCAN untuk mencari WiFi terlebih dahulu,");
+    Serial.println("atau langsung ketik SSID lalu tekan Enter:");
     while (Serial.available()) { Serial.read(); delay(2); }
-    Serial.println("Ketik SSID lalu tekan Enter:");
+
     while (!Serial.available()) delay(10);
-    WIFI_SSID=Serial.readStringUntil('\n'); WIFI_SSID.replace("\r",""); WIFI_SSID.trim();
+    String input = Serial.readStringUntil('\n'); input.replace("\r",""); input.trim();
+
+    // ---- Fitur SCAN (sama seperti tombol "CARI WIFI DI SEKITAR" di UI) ----
+    if (input.equalsIgnoreCase("SCAN")) {
+        Serial.println("\n[WiFi] Memindai jaringan sekitar...");
+        WiFi.disconnect(); delay(100);
+        int n = WiFi.scanNetworks();
+        if (n <= 0) {
+            Serial.println("[WiFi] Tidak ada WiFi ditemukan.");
+            Serial.println("=========================================\n");
+            return;
+        }
+        Serial.println("\n----- DAFTAR WIFI DITEMUKAN -----");
+        for (int i = 0; i < n; i++) {
+            int encType = WiFi.encryptionType(i);
+            String encStr;
+            if (encType == WIFI_AUTH_OPEN) encStr = "Terbuka";
+            else if (encType == WIFI_AUTH_WPA2_ENTERPRISE) encStr = "WPA2 Enterprise";
+            else encStr = "WPA/WPA2";
+            Serial.print("  "); Serial.print(i + 1); Serial.print(") ");
+            Serial.print(WiFi.SSID(i));
+            Serial.print("  ["); Serial.print(encStr); Serial.print("]");
+            Serial.print("  RSSI: "); Serial.print(WiFi.RSSI(i)); Serial.println(" dBm");
+        }
+        Serial.println("---------------------------------");
+        Serial.println("Ketik nomor (1-" + String(n) + ") atau ketik SSID manual:");
+        while (Serial.available()) { Serial.read(); delay(2); }
+        while (!Serial.available()) delay(10);
+        input = Serial.readStringUntil('\n'); input.replace("\r",""); input.trim();
+
+        // Cek apakah input adalah nomor
+        int sel = input.toInt();
+        if (sel >= 1 && sel <= n) {
+            WIFI_SSID = WiFi.SSID(sel - 1);
+            int selEnc = WiFi.encryptionType(sel - 1);
+            if (selEnc == WIFI_AUTH_WPA2_ENTERPRISE) {
+                WIFI_IS_ENT = true;
+            } else if (selEnc == WIFI_AUTH_OPEN) {
+                // Jaringan terbuka, langsung konek tanpa password
+                WIFI_IS_ENT = false;
+                WIFI_PASSWORD = "";
+                WIFI_USER = "";
+                Serial.print("[WiFi] Jaringan terbuka: "); Serial.println(WIFI_SSID);
+                Serial.println("[WiFi] Menghubungkan...");
+                if (connectWiFi(20000)) {
+                    eepromSaveWiFi(WIFI_SSID, WIFI_PASSWORD, WIFI_USER, WIFI_IS_ENT);
+                    if (currentScreen == SCR_MAIN) refreshMainWiFiStatus();
+                    else drawWiFiScreen();
+                } else {
+                    Serial.println("[WiFi] Koneksi gagal.");
+                }
+                Serial.println("=========================================\n");
+                return;
+            } else {
+                WIFI_IS_ENT = false;
+            }
+        } else {
+            WIFI_SSID = input;
+            WIFI_IS_ENT = false; // Default, akan ditanya di bawah
+        }
+    } else {
+        WIFI_SSID = input;
+        WIFI_IS_ENT = false;
+    }
+
     Serial.print("SSID: ["); Serial.print(WIFI_SSID); Serial.println("]");
+
+    // ---- Tanya tipe jaringan (sama seperti deteksi otomatis di UI) ----
+    if (!WIFI_IS_ENT) {
+        while (Serial.available()) { Serial.read(); delay(2); }
+        Serial.println("\nTipe jaringan:");
+        Serial.println("  1) WPA/WPA2 Personal (Password saja)");
+        Serial.println("  2) WPA2 Enterprise / Kampus (Username + Password)");
+        Serial.println("  3) Terbuka (Tanpa password)");
+        Serial.println("Pilih (1/2/3) [default=1]:");
+        while (!Serial.available()) delay(10);
+        String tipe = Serial.readStringUntil('\n'); tipe.replace("\r",""); tipe.trim();
+        if (tipe == "2") {
+            WIFI_IS_ENT = true;
+        } else if (tipe == "3") {
+            WIFI_IS_ENT = false;
+            WIFI_PASSWORD = "";
+            WIFI_USER = "";
+            Serial.println("[WiFi] Jaringan terbuka, tanpa password.");
+            Serial.println("[WiFi] Menghubungkan...");
+            if (connectWiFi(20000)) {
+                eepromSaveWiFi(WIFI_SSID, WIFI_PASSWORD, WIFI_USER, WIFI_IS_ENT);
+                if (currentScreen == SCR_MAIN) refreshMainWiFiStatus();
+                else drawWiFiScreen();
+            } else {
+                Serial.println("[WiFi] Koneksi gagal. Kredensial tidak disimpan.");
+            }
+            Serial.println("=========================================\n");
+            return;
+        }
+    }
+
+    // ---- Input Username (untuk Enterprise, sama seperti field Username di UI) ----
+    if (WIFI_IS_ENT) {
+        Serial.println("\n[Enterprise] Jaringan ini butuh Username (sama seperti di UI).");
+        while (Serial.available()) { Serial.read(); delay(2); }
+        Serial.println("Ketik Username lalu tekan Enter:");
+        while (!Serial.available()) delay(10);
+        WIFI_USER = Serial.readStringUntil('\n'); WIFI_USER.replace("\r",""); WIFI_USER.trim();
+        Serial.print("Username: ["); Serial.print(WIFI_USER); Serial.println("]");
+    } else {
+        WIFI_USER = "";
+    }
+
+    // ---- Input Password (sama seperti field Password di UI) ----
     while (Serial.available()) { Serial.read(); delay(2); }
-    Serial.println("Ketik Password lalu tekan Enter (kosong=open):");
+    Serial.println("Ketik Password lalu tekan Enter (kosong=tanpa password):");
     while (!Serial.available()) delay(10);
-    WIFI_PASSWORD=Serial.readStringUntil('\n'); WIFI_PASSWORD.replace("\r",""); WIFI_PASSWORD.trim();
+    WIFI_PASSWORD = Serial.readStringUntil('\n'); WIFI_PASSWORD.replace("\r",""); WIFI_PASSWORD.trim();
     Serial.print("Password: ["); Serial.print(WIFI_PASSWORD.length()); Serial.println(" karakter]");
-    WIFI_USER = ""; WIFI_IS_ENT = false;
+
+    // ---- Konfirmasi (seperti tombol SAMBUNGKAN di UI) ----
+    Serial.println("\n--- Ringkasan ---");
+    Serial.print("  SSID     : "); Serial.println(WIFI_SSID);
+    Serial.print("  Tipe     : "); Serial.println(WIFI_IS_ENT ? "WPA2 Enterprise" : "WPA Personal");
+    if (WIFI_IS_ENT) { Serial.print("  Username : "); Serial.println(WIFI_USER); }
+    Serial.print("  Password : "); Serial.print(WIFI_PASSWORD.length()); Serial.println(" karakter");
+    Serial.println("-----------------");
+    Serial.println("Ketik Y untuk SAMBUNGKAN, atau N untuk BATAL:");
+    while (Serial.available()) { Serial.read(); delay(2); }
+    while (!Serial.available()) delay(10);
+    String konfirm = Serial.readStringUntil('\n'); konfirm.replace("\r",""); konfirm.trim();
+    konfirm.toUpperCase();
+    if (konfirm != "Y") {
+        Serial.println("[WiFi] Dibatalkan oleh pengguna.");
+        Serial.println("=========================================\n");
+        return;
+    }
+
+    // ---- Sambungkan (sama seperti tombol SAMBUNGKAN di UI) ----
+    Serial.println("[WiFi] Menghubungkan...");
     if (connectWiFi(20000)) {
-        eepromSaveWiFi(WIFI_SSID,WIFI_PASSWORD,WIFI_USER,WIFI_IS_ENT);
-        if (currentScreen==SCR_MAIN) refreshMainWiFiStatus();
+        eepromSaveWiFi(WIFI_SSID, WIFI_PASSWORD, WIFI_USER, WIFI_IS_ENT);
+        Serial.println("[WiFi] Berhasil! Kredensial tersimpan ke EEPROM.");
+        if (currentScreen == SCR_MAIN) refreshMainWiFiStatus();
         else drawWiFiScreen();
     } else {
         Serial.println("[WiFi] Koneksi gagal. Kredensial tidak disimpan.");
     }
+    Serial.println("=========================================\n");
 }
 
 void serialMenu() {
@@ -1167,7 +1300,7 @@ void setup() {
     Serial.println(" S     = Spasi (mode Kata)");
     Serial.println(" X     = Hapus huruf terakhir");
     Serial.println(" M     = Ganti Mode (Huruf/Angka/Kata)");
-    Serial.println(" W     = Input WiFi baru via Serial");
+    Serial.println(" W     = Input WiFi (SCAN/Enterprise/Personal)");
     Serial.println(" CLR   = Hapus WiFi dari EEPROM");
     Serial.println(" @     = Tampilkan status lengkap");
     Serial.println(" !     = Tes suara TTS");
