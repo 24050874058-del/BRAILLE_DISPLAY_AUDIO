@@ -1,18 +1,29 @@
 // ============================================================
-// BRAILLE LOGIC
+// BRAILLE LOGIC & KALKULATOR
 // ============================================================
 
-char decodeBraille(uint8_t p, bool isNum) {
-    if (isNum) { 
+char decodeBraille(uint8_t p, int mode) {
+    if (mode == 1 || mode == 3) { // Angka atau Kalkulator
         switch(p) {
             case 0b000001: return '1'; case 0b000011: return '2';
             case 0b001001: return '3'; case 0b011001: return '4';
             case 0b010001: return '5'; case 0b001011: return '6';
             case 0b011011: return '7'; case 0b010011: return '8';
             case 0b001010: return '9'; case 0b011010: return '0';
-            default: return '?'; 
-        } 
+        }
+        if (mode == 3) {
+            switch(p) {
+                case 0b010110: return '+'; // 2,3,5
+                case 0b100100: return '-'; // 3,6
+                case 0b100110: return '*'; // 2,3,6
+                case 0b001100: return '/'; // 3,4
+                case 0b110110: return '='; // 2,3,5,6
+            }
+        }
+        if (mode == 1 || mode == 3) return '?';
     }
+    
+    // Mode 0 dan 2 (Huruf / Kata)
     switch(p) {
         case 0b000001: return 'a'; case 0b000011: return 'b';
         case 0b001001: return 'c'; case 0b011001: return 'd';
@@ -29,6 +40,56 @@ char decodeBraille(uint8_t p, bool isNum) {
         case 0b111101: return 'y'; case 0b110101: return 'z';
         default: return '?';
     }
+}
+
+void calculateResult() {
+    if (currentWord.length() == 0) return;
+    
+    int opPos = -1;
+    char op = ' ';
+    // Mulai dari index 1 agar angka pertama boleh minus
+    for(int i=1; i<currentWord.length(); i++) {
+        char c = currentWord[i];
+        if(c=='+' || c=='-' || c=='*' || c=='/') { opPos = i; op = c; break; }
+    }
+    
+    if(opPos != -1) {
+        float num1 = currentWord.substring(0, opPos).toFloat();
+        float num2 = currentWord.substring(opPos+1).toFloat();
+        float res = 0;
+        
+        if(op=='+') res = num1+num2;
+        else if(op=='-') res = num1-num2;
+        else if(op=='*') res = num1*num2;
+        else if(op=='/') {
+            if (num2 != 0) res = num1/num2;
+            else { 
+                speak("Error bagi nol"); 
+                currentWord="Err"; 
+                if (currentScreen==SCR_MAIN) drawMainScreen(); 
+                return; 
+            }
+        }
+        
+        String resStr = String(res, 2);
+        if(resStr.endsWith(".00")) resStr = String((int)res);
+        
+        currentWord = resStr;
+        Serial.print("[Kalkulator] Hasil: "); Serial.println(currentWord);
+        speak("Sama dengan " + currentWord);
+    } else {
+        speak(currentWord);
+    }
+    if (currentScreen==SCR_MAIN) drawMainScreen();
+}
+
+void appendMathOp(char op) {
+    currentWord += op;
+    if (op == '+') speak("tambah");
+    else if (op == '-') speak("kurang");
+    else if (op == '*') speak("kali");
+    else if (op == '/') speak("bagi");
+    if (currentScreen==SCR_MAIN) drawMainScreen();
 }
 
 void handleButtonPress(int pin) {
@@ -55,8 +116,12 @@ void handleButtonPress(int pin) {
         }
     }
     else if (pin==6) { // ENTER
-        if (currentPattern==0) { Serial.println("[Braille] Pola kosong, abaikan."); return; }
-        char c=decodeBraille(currentPattern,(currentMode==1));
+        if (currentPattern==0) { 
+            if (currentMode==3) calculateResult(); 
+            else Serial.println("[Braille] Pola kosong, abaikan."); 
+            return; 
+        }
+        char c=decodeBraille(currentPattern, currentMode);
         if (c=='?') {
             Serial.println("[Braille] Pola tidak dikenal!");
             speak("Pola salah");
@@ -66,11 +131,21 @@ void handleButtonPress(int pin) {
                 lastChar = c;
                 speak(String(c));
                 if (currentScreen==SCR_MAIN) drawMainScreen();
-            } else if (currentMode==2) {
-                currentWord+=c;
-                Serial.print("[Braille] Kata: "); Serial.println(currentWord);
-                speak(String(c));
-                if (currentScreen==SCR_MAIN) drawMainScreen(); // redraw full to clear transparent font overlap
+            } else if (currentMode==2 || currentMode==3) {
+                if (currentMode==3 && c == '=') {
+                    calculateResult();
+                } else {
+                    currentWord+=c;
+                    Serial.print("[Braille] Buffer: "); Serial.println(currentWord);
+                    
+                    if (c == '+') speak("tambah");
+                    else if (c == '-') speak("kurang");
+                    else if (c == '*') speak("kali");
+                    else if (c == '/') speak("bagi");
+                    else speak(String(c));
+                    
+                    if (currentScreen==SCR_MAIN) drawMainScreen(); // redraw full
+                }
             }
         }
         currentPattern=0;
@@ -81,40 +156,51 @@ void handleButtonPress(int pin) {
             speak(currentWord);
             currentWord="";
             if (currentScreen==SCR_MAIN) drawMainScreen();
+        } else if (currentMode==3) {
+            currentWord="";
+            speak("Reset Kalkulator");
+            if (currentScreen==SCR_MAIN) drawMainScreen();
         } else {
-            Serial.println("[Braille] Spasi hanya di mode Kata.");
+            Serial.println("[Braille] Spasi hanya di mode Kata atau Kalkulator.");
         }
     }
     else if (pin==8) { // HAPUS
-        if (currentMode==2 && currentWord.length()>0) {
+        if ((currentMode==2 || currentMode==3) && currentWord.length()>0) {
             currentWord.remove(currentWord.length()-1);
-            Serial.print("[Braille] Hapus. Kata: "); Serial.println(currentWord);
+            Serial.print("[Braille] Hapus. Buffer: "); Serial.println(currentWord);
             speak("Hapus");
             if (currentScreen==SCR_MAIN) drawMainScreen();
         }
         currentPattern=0;
     }
-    else if (pin==9) { // GANTI MODE
-        currentMode=(currentMode+1)%3;
-        currentPattern=0; currentWord=""; lastChar='-';
-        const char* mn[]={"Mode Huruf","Mode Angka","Mode Kata"};
-        Serial.print("[Braille] "); Serial.println(mn[currentMode]);
+    else if (pin == 9) { // GANTI MODE
+        currentMode = (currentMode + 1) % 4;
+        currentPattern = 0; currentWord = ""; lastChar = '-';
+        const char* mn[] = {"Mode Huruf", "Mode Angka", "Mode Kata", "Mode Kalkulator"};
         speak(mn[currentMode]);
-        if (currentScreen==SCR_MAIN) drawMainScreen();
+        if (currentScreen == SCR_MAIN) drawMainScreen();
     }
+    // == TAMBAHAN TOMBOL FISIK KALKULATOR (PIN 10 - 13) ==
+    else if (pin == 10) { appendMathOp('+'); } // Pin 10 = Tambah (+)
+    else if (pin == 11) { appendMathOp('-'); } // Pin 11 = Kurang (-)
+    else if (pin == 12) { appendMathOp('*'); } // Pin 12 = Kali (*)
+    else if (pin == 13) { appendMathOp('/'); } // Pin 13 = Bagi (/)
 }
 
 void checkButtons() {
-    uint16_t readState=mcp1.readGPIOAB();
-    if (readState!=lastFlickerState) { lastDebounceTime=millis(); lastFlickerState=readState; }
-    if ((millis()-lastDebounceTime)>50) {
-        if (readState!=lastButtonState) {
-            for (int i=0;i<10;i++) {
-                bool isP=!(readState&(1<<i));
-                bool wasP=!(lastButtonState&(1<<i));
-                if (isP&&!wasP) handleButtonPress(i);
+    uint32_t readState = mcp1.readGPIOAB();
+    if (readState != lastFlickerState) { 
+        lastDebounceTime = millis(); 
+        lastFlickerState = readState; 
+    }
+    if ((millis() - lastDebounceTime) > 50) {
+        if (readState != lastButtonState) {
+            for (int i = 0; i < 14; i++) { // Ubah batas loop dari 10 menjadi 14 (mencakup pin 0-13)
+                bool isP = !(readState & (1 << i));
+                bool wasP = !(lastButtonState & (1 << i));
+                if (isP && !wasP) handleButtonPress(i);
             }
-            lastButtonState=readState;
+            lastButtonState = readState;
         }
     }
 }

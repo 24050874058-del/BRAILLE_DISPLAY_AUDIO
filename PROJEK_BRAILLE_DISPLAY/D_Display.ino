@@ -146,7 +146,7 @@ void drawMainScreen() {
     tft.setCursor(10,84); tft.print("MODE AKTIF:");
     tft.setFont(&FreeSans12pt7b);
     tft.setTextColor(C_ACCENT); 
-    const char* modeNames[]={"HURUF","ANGKA","KATA"};
+    const char* modeNames[]={"HURUF","ANGKA","KATA","KALKULATOR"};
     tft.setCursor(94,100); tft.print(modeNames[currentMode]);
     
     // ======= DIVIDER VERTIKAL =======
@@ -163,19 +163,35 @@ void drawMainScreen() {
     tft.setFont(); tft.setTextSize(1);
     tft.setTextColor(C_LGRAY,C_SURFACE);
     
-    if (currentMode==2) {
-        tft.setCursor(232,122); tft.print("KATA SAAT INI:");
+    if (currentMode==2 || currentMode==3) {
+        tft.setCursor(232,122); tft.print(currentMode==2 ? "KATA SAAT INI:" : "EKSPRESI MTK:");
         tft.drawFastHLine(224,134,242,C_BORDER);
+        
         tft.setFont(&FreeSansBold24pt7b); tft.setTextSize(1); 
         tft.setTextColor(C_WHITE);
         String txt = currentWord.length() ? currentWord : "-";
         int16_t x1,y1; uint16_t tw,th;
         tft.getTextBounds(txt,0,0,&x1,&y1,&tw,&th);
-        tft.setCursor(220 + (254-tw)/2, 200); 
+        
+        int textY = currentMode==3 ? 180 : 200;
+        tft.setCursor(220 + (254-tw)/2, textY); 
         tft.print(txt);
+        
+        if (currentMode==3) {
+            tft.setFont(); tft.setTextSize(1); tft.setTextColor(C_ACCENT, C_SURFACE);
+            tft.setCursor(232, 215); tft.print("Tekan Tombol Fisik:");
+            tft.setCursor(232, 232); tft.print("[+] Pin 10  [-] Pin 11");
+            tft.setCursor(232, 248); tft.print("[*] Pin 12  [/] Pin 13");
+            tft.setCursor(232, 264); tft.print("[=] Pin 6   [R] Pin 7(Spasi)");
+        } else {
+            tft.setFont(); tft.setTextSize(1); tft.setTextColor(C_DGRAY,C_SURFACE);
+            tft.setCursor(232,254); tft.print("Pola: 0b");
+            for (int i=5;i>=0;i--) tft.print((currentPattern>>i)&1);
+        }
     } else {
         tft.setCursor(232,122); tft.print(currentMode==0 ? "HURUF TERAKHIR:" : "ANGKA TERAKHIR:");
         tft.drawFastHLine(224,134,242,C_BORDER);
+        
         tft.setFont(&FreeSansBold24pt7b); tft.setTextSize(1);
         tft.setTextColor(C_ACCENT);
         String txt = String(lastChar);
@@ -183,12 +199,12 @@ void drawMainScreen() {
         tft.getTextBounds(txt,0,0,&x1,&y1,&tw,&th);
         tft.setCursor(220 + (254-tw)/2, 200); 
         tft.print(txt);
+        
+        // Pola binary kecil
+        tft.setFont(); tft.setTextSize(1); tft.setTextColor(C_DGRAY,C_SURFACE);
+        tft.setCursor(232,254); tft.print("Pola: 0b");
+        for (int i=5;i>=0;i--) tft.print((currentPattern>>i)&1);
     }
-    
-    // Pola binary kecil
-    tft.setFont(); tft.setTextSize(1); tft.setTextColor(C_DGRAY,C_SURFACE);
-    tft.setCursor(232,254); tft.print("Pola: 0b");
-    for (int i=5;i>=0;i--) tft.print((currentPattern>>i)&1);
     
     // ======= TOMBOL KECEPATAN SUARA =======
     uint16_t spdBg = (ttsSpeedMode==0)?C_SUCCESS:((ttsSpeedMode==1)?C_WARNING:C_ERROR);
@@ -289,7 +305,6 @@ void drawWiFiScreen() {
     }
     else if (wifiSubState == W_INPUT) {
         if (kbV) {
-            // compact mode
             tft.setFont(); tft.setTextSize(1); tft.setTextColor(C_LGRAY,C_BG);
             tft.setCursor(8,52); tft.print("SSID: "); tft.print(inputSSID);
             if (inputIsEnt) {
@@ -305,7 +320,6 @@ void drawWiFiScreen() {
             }
             drawKeyboard();
         } else {
-            // normal mode
             tft.setFont(); tft.setTextSize(1); tft.setTextColor(C_WHITE, C_BG);
             tft.setCursor(10, 60); tft.print("Menghubungkan ke: "); tft.print(inputSSID);
             

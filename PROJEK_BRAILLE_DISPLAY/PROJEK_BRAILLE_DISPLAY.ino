@@ -41,6 +41,8 @@ void eepromSaveWiFi(const String &ssid, const String &pass, const String &user, 
 bool eepromLoadWiFi(String &ssid, String &pass, String &user, bool &isEnt);
 void eepromSaveSpeed();
 void speak(const String &text);
+void calculateResult();
+void appendMathOp(char op);
 
 // ============================================================
 // EEPROM DEFS
@@ -137,7 +139,7 @@ String   WIFI_PASSWORD = "";
 String   WIFI_USER     = "";
 bool     WIFI_IS_ENT   = false;
 uint8_t  currentPattern   = 0;
-uint8_t  currentMode      = 0; // 0=Huruf 1=Angka 2=Kata
+uint8_t  currentMode      = 0; // 0=Huruf 1=Angka 2=Kata 3=Kalkulator
 String   currentWord      = "";
 char     lastChar         = '-';
 uint16_t lastButtonState  = 0xFFFF;
@@ -223,9 +225,9 @@ void setup() {
     Serial.println("\n======= PERINTAH SERIAL =======");
     Serial.println(" 1-6   = Toggle Titik Braille 1-6");
     Serial.println(" E     = Konfirmasi / Enter");
-    Serial.println(" S     = Spasi (mode Kata)");
+    Serial.println(" S     = Spasi (Mode Kata/Kalkulator Reset)");
     Serial.println(" X     = Hapus huruf terakhir");
-    Serial.println(" M     = Ganti Mode (Huruf/Angka/Kata)");
+    Serial.println(" M     = Ganti Mode (Huruf/Angka/Kata/Kalkulator)");
     Serial.println(" W     = Input WiFi (SCAN/Enterprise/Personal)");
     Serial.println(" CLR   = Hapus WiFi dari EEPROM");
     Serial.println(" @     = Tampilkan status lengkap");
