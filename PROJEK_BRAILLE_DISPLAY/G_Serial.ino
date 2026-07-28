@@ -12,8 +12,10 @@ void inputWiFiSerial() {
     while (!Serial.available()) delay(10);
     String input = Serial.readStringUntil('\n'); input.replace("\r",""); input.trim();
     
+    // ---- Fitur SCAN (sama seperti tombol "CARI WIFI DI SEKITAR" di UI) ----
     if (input.equalsIgnoreCase("SCAN")) {
         Serial.println("\n[WiFi] Memindai jaringan sekitar...");
+        // WiFi.disconnect(); delay(100); // FIXED BUG HERE
         int n = WiFi.scanNetworks();
         if (n <= 0) {
             Serial.println("[WiFi] Tidak ada WiFi ditemukan.");
@@ -39,6 +41,7 @@ void inputWiFiSerial() {
         while (!Serial.available()) delay(10);
         input = Serial.readStringUntil('\n'); input.replace("\r",""); input.trim();
         
+        // Cek apakah input adalah nomor
         int sel = input.toInt();
         if (sel >= 1 && sel <= n) {
             WIFI_SSID = WiFi.SSID(sel - 1);
@@ -73,6 +76,7 @@ void inputWiFiSerial() {
     }
     Serial.print("SSID: ["); Serial.print(WIFI_SSID); Serial.println("]");
     
+    // ---- Tanya tipe jaringan ----
     if (!WIFI_IS_ENT) {
         while (Serial.available()) { Serial.read(); delay(2); }
         Serial.println("\nTipe jaringan:");
@@ -103,6 +107,7 @@ void inputWiFiSerial() {
         }
     }
     
+    // ---- Input Username ----
     if (WIFI_IS_ENT) {
         Serial.println("\n[Enterprise] Jaringan ini butuh Username (sama seperti di UI).");
         while (Serial.available()) { Serial.read(); delay(2); }
@@ -114,12 +119,14 @@ void inputWiFiSerial() {
         WIFI_USER = "";
     }
     
+    // ---- Input Password ----
     while (Serial.available()) { Serial.read(); delay(2); }
     Serial.println("Ketik Password lalu tekan Enter (kosong=tanpa password):");
     while (!Serial.available()) delay(10);
     WIFI_PASSWORD = Serial.readStringUntil('\n'); WIFI_PASSWORD.replace("\r",""); WIFI_PASSWORD.trim();
     Serial.print("Password: ["); Serial.print(WIFI_PASSWORD.length()); Serial.println(" karakter]");
     
+    // ---- Konfirmasi ----
     Serial.println("\n--- Ringkasan ---");
     Serial.print("  SSID     : "); Serial.println(WIFI_SSID);
     Serial.print("  Tipe     : "); Serial.println(WIFI_IS_ENT ? "WPA2 Enterprise" : "WPA Personal");
@@ -139,6 +146,7 @@ void inputWiFiSerial() {
         return;
     }
     
+    // ---- Sambungkan ----
     Serial.println("[WiFi] Menghubungkan...");
     if (connectWiFi(20000)) {
         eepromSaveWiFi(WIFI_SSID, WIFI_PASSWORD, WIFI_USER, WIFI_IS_ENT);
@@ -168,7 +176,7 @@ void serialMenu() {
             Serial.println("[Serial] ENTER");
             handleButtonPress(6); break;
         case 's': case 'S':
-            Serial.println("[Serial] SPASI / RESET");
+            Serial.println("[Serial] SPASI");
             handleButtonPress(7); break;
         case 'x': case 'X':
             Serial.println("[Serial] HAPUS");
@@ -176,11 +184,6 @@ void serialMenu() {
         case 'm': case 'M':
             Serial.println("[Serial] GANTI MODE");
             handleButtonPress(9); break;
-        // == TAMBAHAN PINTASAN SERIAL OPERATOR ==
-        case '+': handleButtonPress(10); break;
-        case '-': handleButtonPress(11); break;
-        case '*': handleButtonPress(12); break;
-        case '/': handleButtonPress(13); break;
         // ---- Audio ----
         case '!':
             Serial.println("[Serial] Test Audio...");
@@ -204,7 +207,7 @@ void serialMenu() {
             Serial.print("EEPROM   : ");
             Serial.println(eepromLoadWiFi(sv,sp,su,se)?sv:"(kosong)");
             Serial.print("Mode     : ");
-            const char* mn[]={"Huruf","Angka","Kata","Kalkulator"};
+            const char* mn[]={"Huruf","Angka","Kata"};
             Serial.println(mn[currentMode]);
             Serial.print("Pola     : 0b");
             for (int i=5;i>=0;i--) Serial.print((currentPattern>>i)&1);

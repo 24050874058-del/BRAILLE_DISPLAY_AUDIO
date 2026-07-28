@@ -58,17 +58,6 @@ void handleTouchMain(int16_t tx,int16_t ty) {
         drawMainScreen();
         return;
     }
-    
-    // Tombol Kalkulator di layar sentuh
-    if (currentMode == 3) {
-        if (ty >= 230 && ty <= 270) {
-            if (tx >= 224 && tx <= 268) { appendMathOp('+'); return; }
-            if (tx >= 272 && tx <= 316) { appendMathOp('-'); return; }
-            if (tx >= 320 && tx <= 364) { appendMathOp('*'); return; }
-            if (tx >= 368 && tx <= 412) { appendMathOp('/'); return; }
-            if (tx >= 416 && tx <= 468) { calculateResult(); return; }
-        }
-    }
 }
 
 void handleTouchWiFi(int16_t tx,int16_t ty) {
@@ -87,6 +76,7 @@ void handleTouchWiFi(int16_t tx,int16_t ty) {
     if (wifiSubState == W_MENU) {
         if (inRect(tx,ty,8,120,464,50)) {
             wifiSubState = W_SCAN; drawWiFiScreen();
+            // WiFi.disconnect(); delay(100); // FIXED BUG HERE
             wifiFoundCount = WiFi.scanNetworks();
             wifiListPage = 0;
             wifiSubState = W_LIST; drawWiFiScreen();
