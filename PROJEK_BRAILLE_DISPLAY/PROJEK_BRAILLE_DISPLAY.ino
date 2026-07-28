@@ -129,8 +129,12 @@ Audio audio;
 //   Layar Y (0..319) <- rawX (700..3500)
 // ============================================================
 void touchToScreen(int16_t rawX, int16_t rawY, int16_t &sx, int16_t &sy) {
-    sx = constrain(map(rawY, 3600, 470, 0, 480), 0, 480);
-    sy = constrain(map(rawX,  700, 3500, 0, 320), 0, 320);
+    // Definisi Rentang Standar ADC XPT2046 (480x320)
+    // Sumbu Y mentah dipetakan ke Lebar Layar (X = 0 - 479)
+    // Sumbu X mentah dipetakan ke Tinggi Layar (Y = 0 - 319)
+    
+    sx = constrain(map(rawY, 3750, 320, 0, 479), 0, 479);
+    sy = constrain(map(rawX,  350, 3700, 0, 319), 0, 319);
 }
 
 // ============================================================
