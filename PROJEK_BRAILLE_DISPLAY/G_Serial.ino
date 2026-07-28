@@ -184,6 +184,11 @@ void serialMenu() {
         case 'm': case 'M':
             Serial.println("[Serial] GANTI MODE");
             handleButtonPress(9); break;
+        // ---- Calc operators (debug) ----
+        case '+': Serial.println("[Serial] OP: +"); handleButtonPress(10); break;
+        case '-': Serial.println("[Serial] OP: -"); handleButtonPress(11); break;
+        case '*': Serial.println("[Serial] OP: *"); handleButtonPress(12); break;
+        case '/': Serial.println("[Serial] OP: /"); handleButtonPress(13); break;
         // ---- Audio ----
         case '!':
             Serial.println("[Serial] Test Audio...");
@@ -207,7 +212,7 @@ void serialMenu() {
             Serial.print("EEPROM   : ");
             Serial.println(eepromLoadWiFi(sv,sp,su,se)?sv:"(kosong)");
             Serial.print("Mode     : ");
-            const char* mn[]={"Huruf","Angka","Kata"};
+            const char* mn[]={"Huruf","Angka","Kata","Kalkulator"};
             Serial.println(mn[currentMode]);
             Serial.print("Pola     : 0b");
             for (int i=5;i>=0;i--) Serial.print((currentPattern>>i)&1);

@@ -80,153 +80,222 @@ void drawKeyboard() {
 // ============================================================
 // MAIN SCREEN
 // ============================================================
-void drawBrailleDots() {
-    int dotR=28, dotGapX=90, dotGapY=64;
-    int totalH = 2*dotR + 2*dotGapY; 
-    int totalW = 2*dotR + dotGapX;
-    int sX = (210 - totalW) / 2 + 10;
-    int sY = (320 - 44 - 26 - 34 - totalH) / 2 + 44 + 26 + 34 + dotR;
+void drawGearIcon(int16_t cx, int16_t cy, int16_t r_out, int16_t r_in, uint16_t color) {
+    tft.drawCircle(cx, cy, r_out, color);
+    tft.drawCircle(cx, cy, r_in, color);
+    for (int i = 0; i < 8; i++) {
+        float angle = i * PI / 4.0;
+        int16_t x0 = cx + cos(angle) * r_out;
+        int16_t y0 = cy + sin(angle) * r_out;
+        int16_t x1 = cx + cos(angle) * (r_out + 4);
+        int16_t y1 = cy + sin(angle) * (r_out + 4);
+        tft.drawLine(x0, y0, x1, y1, color);
+        tft.drawLine(x0+1, y0, x1+1, y1, color);
+        tft.drawLine(x0, y0+1, x1, y1+1, color);
+    }
+}
+
+void drawWiFiIcon(int16_t cx, int16_t cy, uint16_t color) {
+    // cx, cy is the center of the dot (bottom of the WiFi symbol)
+    tft.fillCircle(cx, cy, 2, color);
+    tft.drawCircle(cx, cy, 6, color);
+    tft.fillRect(cx - 7, cy + 1, 14, 7, C_PRIMARY);
+    tft.drawCircle(cx, cy, 11, color);
+    tft.fillRect(cx - 12, cy + 1, 24, 12, C_PRIMARY);
+    tft.drawCircle(cx, cy, 16, color);
+    tft.fillRect(cx - 17, cy + 1, 34, 17, C_PRIMARY);
+}
+
+void drawWiFiIndicator() {
+    if (currentScreen != SCR_MAIN) return;
+    bool wOK = (WiFi.status() == WL_CONNECTED);
+    tft.fillRect(395, 10, 40, 30, C_PRIMARY);
+    drawWiFiIcon(415, 34, wOK ? C_SUCCESS : C_ERROR);
+}
+
+String getPatternDotsString(uint8_t p) {
+    if (p == 0) return "-";
+    String s = "";
+    for (int i = 0; i < 6; i++) {
+        if ((p >> i) & 1) {
+            if (s.length() > 0) s += ", ";
+            s += String(i + 1);
+        }
+    }
+    return s;
+}
+
+void drawCenteredText(const String &txt, int16_t bx, int16_t by, int16_t bw, int16_t bh, uint16_t color, bool useLargeFont) {
+    tft.setTextColor(color);
+    int16_t x1, y1;
+    uint16_t tw, th;
     
+    if (useLargeFont && txt.length() <= 4) {
+        tft.setFont(&FreeSansBold24pt7b);
+        tft.setTextSize(1);
+    } else {
+        tft.setFont(&FreeSansBold12pt7b);
+        tft.setTextSize(1);
+    }
+    
+    tft.getTextBounds(txt, 0, 0, &x1, &y1, &tw, &th);
+    
+    if (tw > bw - 16) {
+        tft.setFont();
+        tft.setTextSize(2);
+        tft.getTextBounds(txt, 0, 0, &x1, &y1, &tw, &th);
+    }
+    
+    tft.setCursor(bx + (bw - tw) / 2, by + (bh + th) / 2 - 2);
+    tft.print(txt);
+}
+
+void drawStatusBadge() {
+    if (currentScreen != SCR_MAIN) return;
+    
+    // Clear the entire badge bar area first (from x = 245 to 475, y = 60 to 85) with C_BG
+    tft.fillRect(245, 60, 230, 26, C_BG);
+    
+    const char* modeNames[]={"HURUF","ANGKA","KATA","KALKULATOR"};
+    String modeText = "MODE: " + String(modeNames[currentMode]);
+    int16_t x1, y1; uint16_t tw, th;
+    tft.setFont(); tft.setTextSize(1);
+    tft.getTextBounds(modeText, 0, 0, &x1, &y1, &tw, &th);
+    
+    // ponytail: auto-width badge for longer mode names
+    int badgeW = max((int)tw + 16, 105);
+    int badgeX = 250 + (220 - badgeW) / 2;
+    tft.fillRoundRect(badgeX, 60, badgeW, 24, 4, C_PRIMARY);
+    tft.setTextColor(C_WHITE);
+    tft.setCursor(badgeX + (badgeW - tw) / 2, 60 + (24 - th) / 2);
+    tft.print(modeText);
+}
+
+void drawInputCardOnly() {
+    if (currentScreen != SCR_MAIN) return;
+    tft.fillRoundRect(250, 94, 220, 100, 8, C_SURFACE);
+    tft.drawRoundRect(250, 94, 220, 100, 8, C_BORDER);
+    
+    tft.setFont(); tft.setTextSize(1);
+    tft.setTextColor(C_LGRAY);
+    tft.setCursor(258, 102); tft.print("INPUT PENGGUNA");
+    
+    if (currentMode == 3) {
+        String val = calcExpression.length() ? calcExpression : "0";
+        drawCenteredText(val, 250, 112, 220, 48, C_WARNING, true);
+        tft.setFont(); tft.setTextSize(1);
+        tft.setTextColor(C_DGRAY);
+        tft.setCursor(258, 178); tft.print("Ekspresi kalkulator");
+    } else if (currentMode == 2) {
+        String val = currentWord.length() ? currentWord : "-";
+        drawCenteredText(val, 250, 112, 220, 48, C_WHITE, true);
+        tft.setFont(); tft.setTextSize(1);
+        tft.setTextColor(C_DGRAY);
+        tft.setCursor(258, 178); tft.print("Sedang mengetik...");
+    } else {
+        String val = getPatternDotsString(currentPattern);
+        drawCenteredText(val, 250, 112, 220, 48, C_ACCENT, true);
+        tft.setFont(); tft.setTextSize(1);
+        tft.setTextColor(C_DGRAY);
+        String binStr = "0b";
+        for (int i=5; i>=0; i--) binStr += String((currentPattern>>i)&1);
+        int16_t x1, y1; uint16_t tw, th;
+        tft.getTextBounds(binStr, 0, 0, &x1, &y1, &tw, &th);
+        tft.setCursor(250 + (220 - tw) / 2, 178);
+        tft.print(binStr);
+    }
+}
+
+void drawOutputCardOnly() {
+    if (currentScreen != SCR_MAIN) return;
+    tft.fillRoundRect(250, 206, 220, 100, 8, C_SURFACE);
+    tft.drawRoundRect(250, 206, 220, 100, 8, C_BORDER);
+    
+    tft.setFont(); tft.setTextSize(1);
+    tft.setTextColor(C_LGRAY);
+    tft.setCursor(258, 214); tft.print("RESPONS SISTEM");
+    
+    if (currentMode == 3) {
+        String val = calcResult.length() ? calcResult : "-";
+        drawCenteredText(val, 250, 224, 220, 48, C_SUCCESS, true);
+        tft.setFont(); tft.setTextSize(1);
+        tft.setTextColor(C_DGRAY);
+        tft.setCursor(258, 290); tft.print("Hasil kalkulasi");
+    } else if (currentMode == 2) {
+        String val = lastSpokenWord.length() ? lastSpokenWord : "-";
+        drawCenteredText(val, 250, 224, 220, 48, C_SUCCESS, true);
+        tft.setFont(); tft.setTextSize(1);
+        tft.setTextColor(C_DGRAY);
+        tft.setCursor(258, 290); tft.print("Kata terakhir diucapkan");
+    } else {
+        String val = String(lastChar);
+        drawCenteredText(val, 250, 224, 220, 48, C_ACCENT, true);
+        tft.setFont(); tft.setTextSize(1);
+        tft.setTextColor(C_DGRAY);
+        tft.setCursor(258, 290);
+        tft.print(currentMode == 0 ? "Huruf terakhir terjemahan" : "Angka terakhir terjemahan");
+    }
+}
+
+void drawBrailleDots() {
+    int dotR=30, dotGapX=95, dotGapY=70;
+    int sX = 120; 
+    int sY = 185; 
     for (int i=0;i<6;i++) {
-        int col=i/3, row=i%3;
-        int cx=sX+col*dotGapX, cy=sY+row*dotGapY;
+        int col=i/3; 
+        int row=i%3; 
+        int cx = sX - (dotGapX / 2) + col * dotGapX;
+        int cy = sY - dotGapY + row * dotGapY;
         bool act=(currentPattern>>i)&1;
         
         tft.fillCircle(cx,cy,dotR+2,C_BG);
         tft.fillCircle(cx,cy,dotR+2,act?C_WHITE:C_GRAY);
         tft.fillCircle(cx,cy,dotR,act?C_ACCENT:C_DGRAY);
         
-        tft.setFont(&FreeSans12pt7b); tft.setTextSize(1);
-        tft.setTextColor(act?C_BG:C_GRAY);
+        tft.setFont(&FreeSansBold12pt7b); tft.setTextSize(1);
+        tft.setTextColor(act?C_WHITE:C_GRAY);
         int16_t x1,y1; uint16_t tw,th;
         tft.getTextBounds(String(i+1),0,0,&x1,&y1,&tw,&th);
-        tft.setCursor(cx-tw/2, cy+th/2-2);
+        tft.setCursor(cx-tw/2, cy+th/2);
         tft.print(i+1);
     }
 }
 
 void drawMainScreen() {
     tft.fillScreen(C_BG);
+    
     // ======= TOP BAR =======
     tft.fillRect(0,0,480,50,C_PRIMARY);
     tft.setFont(&FreeSansBold12pt7b); tft.setTextSize(1);
     tft.setTextColor(C_WHITE);
     tft.setCursor(14,34); tft.print("Braille Trainer");
     
-    // WiFi icon
-    bool wOK=(WiFi.status()==WL_CONNECTED);
-    uint16_t wCol=wOK?C_SUCCESS:C_ERROR;
-    tft.fillRect(430,0,50,50,C_PRIMARY);
-    tft.drawRoundRect(431,2,48,46,5,wOK?C_SUCCESS:C_ERROR);
-    int cx=455, cy=34;
-    tft.drawCircle(cx,cy,16,wCol);
-    tft.drawCircle(cx,cy,10,wCol);
-    tft.fillCircle(cx,cy, 4,wCol);
-    tft.setTextSize(1); tft.setTextColor(wCol,C_PRIMARY);
-    tft.setCursor(440,4); tft.print("WiFi");
+    // Settings icon (Gear)
+    drawGearIcon(455, 25, 10, 4, C_WHITE);
     
-    // ======= STATUS STRIP =======
-    uint16_t stBg=wOK?0x0320:0x3000;
-    tft.fillRect(0,50,480,24,stBg);
-    tft.setFont(); tft.setTextSize(1);
-    tft.setTextColor(C_WHITE,stBg);
-    tft.setCursor(8,58);
-    if (wOK) {
-        tft.print(" Terhubung: "); tft.print(WIFI_SSID);
-        tft.print("  |  IP: "); tft.print(WiFi.localIP().toString());
-    } else {
-        tft.print(" WiFi terputus  -  Sentuh ikon WiFi di kanan atas untuk mengatur");
-    }
-    
-    // ======= MODE BAR =======
-    tft.fillRect(0,74,480,36,C_SURFACE);
-    tft.drawFastHLine(0,74, 480,C_BORDER);
-    tft.drawFastHLine(0,109,480,C_BORDER);
-    tft.setFont(); tft.setTextSize(1); tft.setTextColor(C_LGRAY,C_SURFACE);
-    tft.setCursor(10,84); tft.print("MODE AKTIF:");
-    tft.setFont(&FreeSans12pt7b);
-    tft.setTextColor(C_ACCENT); 
-    const char* modeNames[]={"HURUF","ANGKA","KATA"};
-    tft.setCursor(94,100); tft.print(modeNames[currentMode]);
+    // WiFi status indicator next to settings icon
+    drawWiFiIndicator();
     
     // ======= DIVIDER VERTIKAL =======
-    tft.drawFastVLine(215,110,200,C_BORDER);
+    tft.drawFastVLine(240,50,270,C_BORDER);
     
     // ======= BRAILLE DOTS (kiri) =======
-    tft.setFont(); tft.setTextSize(1); tft.setTextColor(C_ACCENT,C_BG);
-    tft.setCursor(14,114); tft.print("[ TITIK BRAILLE ]");
     drawBrailleDots();
     
     // ======= PANEL KANAN =======
-    tft.fillRoundRect(220,110,254,170,8,C_SURFACE);
-    tft.drawRoundRect(220,110,254,170,8,C_BORDER);
-    tft.setFont(); tft.setTextSize(1);
-    tft.setTextColor(C_LGRAY,C_SURFACE);
+    // 1. Badges
+    drawStatusBadge();
     
-    if (currentMode==2) {
-        tft.setCursor(232,122); tft.print("KATA SAAT INI:");
-        tft.drawFastHLine(224,134,242,C_BORDER);
-        tft.setFont(&FreeSansBold24pt7b); tft.setTextSize(1); 
-        tft.setTextColor(C_WHITE);
-        String txt = currentWord.length() ? currentWord : "-";
-        int16_t x1,y1; uint16_t tw,th;
-        tft.getTextBounds(txt,0,0,&x1,&y1,&tw,&th);
-        tft.setCursor(220 + (254-tw)/2, 200); 
-        tft.print(txt);
-    } else {
-        tft.setCursor(232,122); tft.print(currentMode==0 ? "HURUF TERAKHIR:" : "ANGKA TERAKHIR:");
-        tft.drawFastHLine(224,134,242,C_BORDER);
-        tft.setFont(&FreeSansBold24pt7b); tft.setTextSize(1);
-        tft.setTextColor(C_ACCENT);
-        String txt = String(lastChar);
-        int16_t x1,y1; uint16_t tw,th;
-        tft.getTextBounds(txt,0,0,&x1,&y1,&tw,&th);
-        tft.setCursor(220 + (254-tw)/2, 200); 
-        tft.print(txt);
-    }
+    // 2. Input Card
+    drawInputCardOnly();
     
-    // Pola binary kecil
-    tft.setFont(); tft.setTextSize(1); tft.setTextColor(C_DGRAY,C_SURFACE);
-    tft.setCursor(232,254); tft.print("Pola: 0b");
-    for (int i=5;i>=0;i--) tft.print((currentPattern>>i)&1);
-    
-    // ======= TOMBOL KECEPATAN SUARA =======
-    uint16_t spdBg = (ttsSpeedMode==0)?C_SUCCESS:((ttsSpeedMode==1)?C_WARNING:C_ERROR);
-    tft.fillRoundRect(220,283,254,24,4,spdBg);
-    tft.setFont(); tft.setTextSize(1);
-    tft.setTextColor((ttsSpeedMode==1)?C_BG:C_WHITE);
-    const char* spdName[] = {"SUARA: NORMAL", "SUARA: LAMBAT", "SUARA: S. LAMBAT"};
-    int16_t bx,by; uint16_t bw,bh;
-    tft.getTextBounds(spdName[ttsSpeedMode],0,0,&bx,&by,&bw,&bh);
-    tft.setCursor(220 + (254-bw)/2, 283 + (24-bh)/2);
-    tft.print(spdName[ttsSpeedMode]);
-    
-    // ======= FOOTER =======
-    tft.fillRect(0,310,480,10,C_SURFACE);
-    tft.drawFastHLine(0,310,480,C_BORDER);
-    tft.setFont(); tft.setTextSize(1); tft.setTextColor(C_DGRAY,C_SURFACE);
-    tft.setCursor(8,312); tft.print("ESP32-S3 Braille Trainer  |  Touch ikon WiFi = Pengaturan Jaringan");
+    // 3. Output Card
+    drawOutputCardOnly();
 }
 
 void refreshMainWiFiStatus() {
-    bool wOK=(WiFi.status()==WL_CONNECTED);
-    uint16_t wCol=wOK?C_SUCCESS:C_ERROR;
-    tft.fillRect(430,0,50,50,C_PRIMARY);
-    tft.drawRoundRect(431,2,48,46,5,wOK?C_SUCCESS:C_ERROR);
-    tft.drawCircle(455,34,16,wCol);
-    tft.drawCircle(455,34,10,wCol);
-    tft.fillCircle(455,34, 4,wCol);
-    tft.setFont(); tft.setTextSize(1); tft.setTextColor(wCol,C_PRIMARY);
-    tft.setCursor(440,4); tft.print("WiFi");
-    uint16_t stBg=wOK?0x0320:0x3000;
-    tft.fillRect(0,50,480,24,stBg);
-    tft.setFont(); tft.setTextSize(1); tft.setTextColor(C_WHITE,stBg);
-    tft.setCursor(8,58);
-    if (wOK) {
-        tft.print(" Terhubung: "); tft.print(WIFI_SSID);
-        tft.print("  |  IP: "); tft.print(WiFi.localIP().toString());
-    } else {
-        tft.print(" WiFi terputus  -  Sentuh ikon WiFi di kanan atas untuk mengatur");
+    if (currentScreen == SCR_MAIN) {
+        drawMainScreen();
     }
 }
 
@@ -242,7 +311,7 @@ void drawWiFiScreen() {
     tft.fillRect(0,0,480,44,C_PRIMARY);
     drawBtn(4,6,80,32,C_KEY_ACT,C_WHITE,"< Balik",1,5);
     tft.setFont(); tft.setTextSize(2); tft.setTextColor(C_WHITE,C_PRIMARY);
-    tft.setCursor(100,12); tft.print("Pengaturan WiFi");
+    tft.setCursor(100,12); tft.print("Pengaturan");
     
     if (wifiSubState == W_MENU) {
         uint16_t stBg=wOK?0x0320:0x3000;
@@ -250,14 +319,20 @@ void drawWiFiScreen() {
         tft.setFont(); tft.setTextSize(1); tft.setTextColor(C_WHITE,stBg);
         tft.setCursor(16,60);
         if (wOK) {
-            tft.print("Terhubung ke: "); tft.print(WIFI_SSID);
+            tft.print("WiFi: Terhubung ke "); tft.print(WIFI_SSID);
             tft.setCursor(16,74); tft.print("IP: "); tft.print(WiFi.localIP().toString());
         } else {
-            tft.print("Status: Terputus dari jaringan.");
+            tft.print("WiFi Status: Terputus dari jaringan.");
         }
         
-        drawBtn(8, 120, 464, 50, C_ACCENT, C_WHITE, "CARI WIFI DI SEKITAR", 1, 8);
-        drawBtn(8, 190, 464, 50, C_ERROR, C_WHITE, "HAPUS WIFI TERSIMPAN", 1, 8);
+        // Speed toggle button inside Settings Menu
+        uint16_t spdBg = (ttsSpeedMode==0)?C_SUCCESS:((ttsSpeedMode==1)?C_WARNING:C_ERROR);
+        uint16_t spdFg = (ttsSpeedMode==1)?C_BG:C_WHITE;
+        const char* spdName[] = {"SUARA: NORMAL", "SUARA: LAMBAT", "SUARA: SANGAT LAMBAT"};
+        drawBtn(8, 105, 464, 45, spdBg, spdFg, spdName[ttsSpeedMode], 1, 8);
+        
+        drawBtn(8, 160, 464, 45, C_ACCENT, C_WHITE, "CARI WIFI DI SEKITAR", 1, 8);
+        drawBtn(8, 215, 464, 45, C_ERROR, C_WHITE, "HAPUS WIFI TERSIMPAN", 1, 8);
     }
     else if (wifiSubState == W_SCAN) {
         tft.setFont(); tft.setTextSize(2); tft.setTextColor(C_WHITE, C_BG);

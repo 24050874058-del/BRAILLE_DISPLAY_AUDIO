@@ -40,22 +40,12 @@ char handleKbTouch(int16_t tx,int16_t ty) {
 }
 
 void handleTouchMain(int16_t tx,int16_t ty) {
-    if (inRect(tx,ty,436,0,44,44)) {
-        Serial.println("[Touch] -> Buka Pengaturan WiFi");
+    // Gear icon for Settings
+    if (inRect(tx,ty,420,0,60,50)) {
+        Serial.println("[Touch] -> Buka Pengaturan");
         wifiSubState = W_MENU;
         editingField=FIELD_NONE; kbPage=0;
         currentScreen=SCR_WIFI; drawWiFiScreen();
-        return;
-    }
-    // Tombol Kecepatan Suara
-    if (inRect(tx,ty,220,283,254,24)) {
-        ttsSpeedMode = (ttsSpeedMode + 1) % 3;
-        Serial.print("[Touch] -> Ubah Kecepatan Suara ke: "); Serial.println(ttsSpeedMode);
-        eepromSaveSpeed();
-        if (ttsSpeedMode == 0) speak("Normal");
-        else if (ttsSpeedMode == 1) speak("Lambat");
-        else speak("Sangat Lambat");
-        drawMainScreen();
         return;
     }
 }
@@ -74,15 +64,27 @@ void handleTouchWiFi(int16_t tx,int16_t ty) {
         }
     }
     if (wifiSubState == W_MENU) {
-        if (inRect(tx,ty,8,120,464,50)) {
+        // Speed Button inside Settings
+        if (inRect(tx,ty,8,105,464,45)) {
+            ttsSpeedMode = (ttsSpeedMode + 1) % 3;
+            Serial.print("[Touch] -> Ubah Kecepatan Suara ke: "); Serial.println(ttsSpeedMode);
+            eepromSaveSpeed();
+            if (ttsSpeedMode == 0) speak("Normal");
+            else if (ttsSpeedMode == 1) speak("Lambat");
+            else speak("Sangat Lambat");
+            drawWiFiScreen();
+            return;
+        }
+        // Scan WiFi Button
+        if (inRect(tx,ty,8,160,464,45)) {
             wifiSubState = W_SCAN; drawWiFiScreen();
-            // WiFi.disconnect(); delay(100); // FIXED BUG HERE
             wifiFoundCount = WiFi.scanNetworks();
             wifiListPage = 0;
             wifiSubState = W_LIST; drawWiFiScreen();
             return;
         }
-        if (inRect(tx,ty,8,190,464,50)) {
+        // Clear WiFi Button
+        if (inRect(tx,ty,8,215,464,45)) {
             eepromClearWiFi();
             WIFI_SSID=WIFI_PASSWORD=WIFI_USER=""; WIFI_IS_ENT=false;
             WiFi.disconnect(true); drawWiFiScreen(); return;

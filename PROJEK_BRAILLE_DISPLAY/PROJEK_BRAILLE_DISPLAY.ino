@@ -41,6 +41,15 @@ void eepromSaveWiFi(const String &ssid, const String &pass, const String &user, 
 bool eepromLoadWiFi(String &ssid, String &pass, String &user, bool &isEnt);
 void eepromSaveSpeed();
 void speak(const String &text);
+void drawStatusBadge();
+void drawInputCardOnly();
+void drawOutputCardOnly();
+void drawCenteredText(const String &txt, int16_t bx, int16_t by, int16_t bw, int16_t bh, uint16_t color, bool useLargeFont = true);
+String getPatternDotsString(uint8_t p);
+String evalCalc(const String &expr);
+void drawGearIcon(int16_t cx, int16_t cy, int16_t r_out, int16_t r_in, uint16_t color);
+void drawWiFiIcon(int16_t cx, int16_t cy, uint16_t color);
+void drawWiFiIndicator();
 
 // ============================================================
 // EEPROM DEFS
@@ -147,6 +156,10 @@ unsigned long lastTouchMs = 0;
 #define TOUCH_DEBOUNCE_MS 220
 const uint8_t extraGPIO[6] = { 1, 3, 16, 17, 21, 22 };
 uint8_t ttsSpeedMode = 2; // 0=Normal, 1=Lambat, 2=Sangat Lambat
+String   appStatus     = "Listening";
+String   lastSpokenWord = "-";
+String   calcExpression = "";
+String   calcResult     = "";
 
 // ============================================================
 // SETUP
@@ -225,7 +238,8 @@ void setup() {
     Serial.println(" E     = Konfirmasi / Enter");
     Serial.println(" S     = Spasi (mode Kata)");
     Serial.println(" X     = Hapus huruf terakhir");
-    Serial.println(" M     = Ganti Mode (Huruf/Angka/Kata)");
+    Serial.println(" M     = Ganti Mode (Huruf/Angka/Kata/Kalkulator)");
+    Serial.println(" +−*/  = Operator Kalkulator (mode Kalkulator)");
     Serial.println(" W     = Input WiFi (SCAN/Enterprise/Personal)");
     Serial.println(" CLR   = Hapus WiFi dari EEPROM");
     Serial.println(" @     = Tampilkan status lengkap");
@@ -233,12 +247,29 @@ void setup() {
     Serial.println("================================\n");
 }
 
-// ============================================================
-// LOOP
-// ============================================================
 void loop() {
     audio.loop();
     checkButtons();
     handleTouch();
     serialMenu();
+    
+    // Auto-update status to Speaking or Listening based on audio engine state
+    if (audio.isRunning()) {
+        if (appStatus != "Speaking") {
+            appStatus = "Speaking";
+            drawStatusBadge();
+        }
+    } else {
+        if (appStatus == "Speaking") {
+            appStatus = "Listening";
+            drawStatusBadge();
+        }
+    }
+    
+    // Auto-refresh WiFi indicator every 5 seconds
+    static unsigned long lastWifiCheck = 0;
+    if (millis() - lastWifiCheck > 5000) {
+        lastWifiCheck = millis();
+        drawWiFiIndicator();
+    }
 }

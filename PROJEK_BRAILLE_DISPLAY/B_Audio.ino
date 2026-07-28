@@ -14,6 +14,8 @@ void initAudio() {
 
 void speak(const String &text) {
     if (WiFi.status() == WL_CONNECTED) {
+        appStatus = "Processing";
+        drawStatusBadge();
         // Kecepatan suara bisa diatur lewat parameter URL
         audio.connecttospeech(text.c_str(), getTtsSpeedParam().c_str());
     }
