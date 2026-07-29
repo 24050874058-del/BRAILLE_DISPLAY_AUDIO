@@ -95,8 +95,8 @@ Audio audio;
 // ============================================================
 // COLORS (RGB565)
 // ============================================================
-#define C_BG      0x0841
-#define C_SURFACE 0x1082
+#define C_BG      0x0000  
+#define C_SURFACE 0x1082  
 #define C_BORDER  0x2965
 #define C_PRIMARY 0x0278
 #define C_ACCENT  0x07FF
@@ -197,7 +197,7 @@ void setup() {
 
     // Teks "Trainer ESP32-S3"
     tft.setFont(&FreeSans9pt7b); //[cite: 1]
-    tft.setTextColor(C_DGRAY); //[cite: 1]
+    tft.setTextColor(C_GRAY); //[cite: 1]
     tft.getTextBounds("Trainer ESP32-S3",0,0,&x1,&y1,&tw,&th); //[cite: 1]
     tft.setCursor((480-(int16_t)tw)/2, 260); //[cite: 1]
     tft.print("Trainer ESP32-S3"); //[cite: 1]
