@@ -2,6 +2,7 @@
  * ESP32-S3 Braille Trainer  -  LANDSCAPE 480x320
  * Hardware: ST7796S TFT, HR2046 Touch, MCP23017, MAX98357A I2S
  **************************************************************************/
+#include <stdint.h>
 #include <WiFi.h>
 #include <esp_wifi.h>
 #if __has_include("esp_eap_client.h")
@@ -22,6 +23,7 @@
 #include <XPT2046_Touchscreen.h>
 #include <Adafruit_MCP23X17.h>
 #include "Audio.h"
+#include "Gambar.h"
 
 // ---- Forward declarations ----
 bool connectWiFi(unsigned long timeoutMs = 20000);
@@ -180,29 +182,31 @@ void setup() {
     SPI.begin(TFT_SCLK,TFT_MISO,TFT_MOSI,-1);
     tft.init(320,480,0,0,ST7796S_RGB);
     tft.setRotation(1); // Landscape 480x320
-    
+    tft.fillScreen(0x0000);
     // Splash screen - CENTERED
-    tft.fillScreen(C_BG);
-    tft.drawRoundRect(60, 80, 360, 160, 16, C_BORDER);
-    tft.fillRoundRect(62, 82, 356, 156, 14, C_SURFACE);
+    tft.drawRGBBitmap(161, 30, logo_unesa, 158, 170);
+
+    tft.setFont(&FreeSansBold24pt7b); tft.setTextSize(1); //[cite: 1]
+    tft.setTextColor(C_ACCENT); //[cite: 1]
+    int16_t x1,y1; uint16_t tw,th; //[cite: 1]
     
-    tft.setFont(&FreeSansBold24pt7b); tft.setTextSize(1);
-    tft.setTextColor(C_ACCENT);
-    int16_t x1,y1; uint16_t tw,th;
-    tft.getTextBounds("Braille",0,0,&x1,&y1,&tw,&th);
-    tft.setCursor((480-(int16_t)tw)/2, 145);
-    tft.print("Braille");
-    
-    tft.setFont(&FreeSans9pt7b);
-    tft.setTextColor(C_DGRAY);
-    tft.getTextBounds("Trainer ESP32-S3",0,0,&x1,&y1,&tw,&th);
-    tft.setCursor((480-(int16_t)tw)/2, 190);
-    tft.print("Trainer ESP32-S3");
-    
-    tft.setTextColor(C_SUCCESS);
-    tft.getTextBounds("Memuat...",0,0,&x1,&y1,&tw,&th);
-    tft.setCursor((480-(int16_t)tw)/2, 220);
-    tft.print("Memuat...");
+    // Teks "Braille"
+    tft.getTextBounds("Braille",0,0,&x1,&y1,&tw,&th); //[cite: 1]
+    tft.setCursor((480-(int16_t)tw)/2, 240); //[cite: 1]
+    tft.print("Braille"); //[cite: 1]
+
+    // Teks "Trainer ESP32-S3"
+    tft.setFont(&FreeSans9pt7b); //[cite: 1]
+    tft.setTextColor(C_DGRAY); //[cite: 1]
+    tft.getTextBounds("Trainer ESP32-S3",0,0,&x1,&y1,&tw,&th); //[cite: 1]
+    tft.setCursor((480-(int16_t)tw)/2, 260); //[cite: 1]
+    tft.print("Trainer ESP32-S3"); //[cite: 1]
+
+    // Teks "Memuat..."
+    tft.setTextColor(C_SUCCESS); //[cite: 1]
+    tft.getTextBounds("Memuat...",0,0,&x1,&y1,&tw,&th); //[cite: 1]
+    tft.setCursor((480-(int16_t)tw)/2, 290); //[cite: 1]
+    tft.print("Memuat..."); //[cite: 1]
     Serial.println("[LCD] ST7796S OK (Landscape 480x320)");
     
     // Touch Init
