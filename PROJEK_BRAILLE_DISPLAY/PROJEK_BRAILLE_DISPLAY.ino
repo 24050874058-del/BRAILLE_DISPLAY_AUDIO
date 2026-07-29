@@ -14,11 +14,14 @@
 #include <SPI.h>
 #include <EEPROM.h>
 #include <Adafruit_GFX.h>
-#include <Fonts/FreeSans9pt7b.h>
-#include <Fonts/FreeSans12pt7b.h>
-#include <Fonts/FreeSans18pt7b.h>
-#include <Fonts/FreeSansBold12pt7b.h>
-#include <Fonts/FreeSansBold24pt7b.h>
+#include "CutePixel8pt.h"
+#include "CutePixel12pt.h"
+#include "CutePixel16pt.h"
+#include "CutePixel24pt.h"
+#include "CutePixel36pt.h"
+#include "CutePixel48pt.h"
+#include "CutePixel60pt.h"
+#include "CutePixel72pt.h"
 #include <Adafruit_ST7796S.h>
 #include <XPT2046_Touchscreen.h>
 #include <Adafruit_MCP23X17.h>
@@ -186,20 +189,20 @@ void setup() {
     // Splash screen - CENTERED
     tft.drawRGBBitmap(161, 30, logo_unesa, 158, 170);
 
-    tft.setFont(&FreeSansBold24pt7b); tft.setTextSize(1); //[cite: 1]
+    tft.setFont(&CutePixel60pt); tft.setTextSize(1); //[cite: 1]
     tft.setTextColor(C_ACCENT); //[cite: 1]
     int16_t x1,y1; uint16_t tw,th; //[cite: 1]
     
     // Teks "Braille"
     tft.getTextBounds("Braille",0,0,&x1,&y1,&tw,&th); //[cite: 1]
-    tft.setCursor((480-(int16_t)tw)/2, 240); //[cite: 1]
+    tft.setCursor((480-(int16_t)tw)/2, 235 - y1); //[cite: 1]
     tft.print("Braille"); //[cite: 1]
 
     // Teks "Trainer ESP32-S3"
-    tft.setFont(&FreeSans9pt7b); //[cite: 1]
+    tft.setFont(&CutePixel24pt); //[cite: 1]
     tft.setTextColor(C_GRAY); //[cite: 1]
     tft.getTextBounds("Trainer ESP32-S3",0,0,&x1,&y1,&tw,&th); //[cite: 1]
-    tft.setCursor((480-(int16_t)tw)/2, 260); //[cite: 1]
+    tft.setCursor((480-(int16_t)tw)/2, 270 - y1); //[cite: 1]
     tft.print("Trainer ESP32-S3"); //[cite: 1]
 
     // Teks "Memuat..."
