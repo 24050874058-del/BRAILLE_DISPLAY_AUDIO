@@ -185,6 +185,7 @@ void setup() {
     SPI.begin(TFT_SCLK,TFT_MISO,TFT_MOSI,-1);
     tft.init(320,480,0,0,ST7796S_RGB);
     tft.setRotation(1); // Landscape 480x320
+    tft.setTextWrap(false);
     tft.fillScreen(0x0000);
     // Splash screen - CENTERED
     tft.drawRGBBitmap(161, 30, logo_unesa, 158, 170);
@@ -195,20 +196,20 @@ void setup() {
     
     // Teks "Braille"
     tft.getTextBounds("Braille",0,0,&x1,&y1,&tw,&th); //[cite: 1]
-    tft.setCursor((480-(int16_t)tw)/2, 235 - y1); //[cite: 1]
+    tft.setCursor((480-(int16_t)tw)/2 - x1, 235 - y1); //[cite: 1]
     tft.print("Braille"); //[cite: 1]
 
     // Teks "Trainer ESP32-S3"
     tft.setFont(&CutePixel24pt); //[cite: 1]
     tft.setTextColor(C_GRAY); //[cite: 1]
     tft.getTextBounds("Trainer ESP32-S3",0,0,&x1,&y1,&tw,&th); //[cite: 1]
-    tft.setCursor((480-(int16_t)tw)/2, 270 - y1); //[cite: 1]
+    tft.setCursor((480-(int16_t)tw)/2 - x1, 270 - y1); //[cite: 1]
     tft.print("Trainer ESP32-S3"); //[cite: 1]
 
     // Teks "Memuat..."
     tft.setTextColor(C_SUCCESS); //[cite: 1]
     tft.getTextBounds("Memuat...",0,0,&x1,&y1,&tw,&th); //[cite: 1]
-    tft.setCursor((480-(int16_t)tw)/2, 290); //[cite: 1]
+    tft.setCursor((480-(int16_t)tw)/2 - x1, 290 - y1); //[cite: 1]
     tft.print("Memuat..."); //[cite: 1]
     Serial.println("[LCD] ST7796S OK (Landscape 480x320)");
     

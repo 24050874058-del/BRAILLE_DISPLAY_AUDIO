@@ -14,7 +14,7 @@ void drawBtn(int16_t x,int16_t y,int16_t w,int16_t h, uint16_t bg,uint16_t fg,co
     else { tft.setFont(&CutePixel24pt); tft.setTextSize(1); }
     tft.setTextColor(fg,bg);
     tft.getTextBounds(lbl,0,0,&x1,&y1,&tw,&th);
-    tft.setCursor(x+(w-(int16_t)tw)/2, y+(h-(int16_t)th)/2 - y1);
+    tft.setCursor(x + (w - (int16_t)tw) / 2 - x1, y + (h - (int16_t)th) / 2 - y1);
     tft.print(lbl);
 }
 
@@ -30,7 +30,8 @@ void drawField(int16_t x,int16_t y,int16_t w,int16_t h, const String &text,bool 
     
     if (text.length()==0) {
         tft.setTextColor(C_DGRAY,C_SURFACE);
-        tft.setCursor(x+6, y+(h-(int16_t)th)/2 - y1); tft.print(ph);
+        tft.setCursor(x + 6 - x1, y + (h - (int16_t)th) / 2 - y1);
+        tft.print(ph);
     } else {
         tft.setTextColor(C_WHITE,C_SURFACE);
         String d="";
@@ -40,7 +41,8 @@ void drawField(int16_t x,int16_t y,int16_t w,int16_t h, const String &text,bool 
         // Approximate character width in CutePixel16pt
         int mc=(w-12)/12;
         if ((int)d.length()>mc) d=d.substring(d.length()-mc);
-        tft.setCursor(x+6, y+(h-(int16_t)th)/2 - y1); tft.print(d);
+        tft.setCursor(x + 6 - x1, y + (h - (int16_t)th) / 2 - y1);
+        tft.print(d);
         if (active) {
             int cx=x+6+d.length()*12;
             if (cx<x+w-4) tft.fillRect(cx,y+4,2,h-8,C_ACCENT);
@@ -160,7 +162,7 @@ void drawCenteredText(const String &txt, int16_t bx, int16_t by, int16_t bw, int
         tft.getTextBounds(txt, 0, 0, &x1, &y1, &tw, &th);
     }
     
-    tft.setCursor(bx + (bw - tw) / 2, by + (bh - th) / 2 - y1);
+    tft.setCursor(bx + (bw - tw) / 2 - x1, by + (bh - th) / 2 - y1);
     tft.print(txt);
 }
 
@@ -181,7 +183,7 @@ void drawStatusBadge() {
     int badgeX = 250 + (220 - badgeW) / 2;
     tft.fillRoundRect(badgeX, 60, badgeW, 24, 4, C_PRIMARY);
     tft.setTextColor(C_WHITE);
-    tft.setCursor(badgeX + (badgeW - tw) / 2, 60 + (24 - th) / 2 - y1);
+    tft.setCursor(badgeX + (badgeW - tw) / 2 - x1, 60 + (24 - th) / 2 - y1);
     tft.print(modeText);
 }
 
@@ -215,7 +217,7 @@ void drawInputCardOnly() {
         for (int i=5; i>=0; i--) binStr += String((currentPattern>>i)&1);
         int16_t x1, y1; uint16_t tw, th;
         tft.getTextBounds(binStr, 0, 0, &x1, &y1, &tw, &th);
-        tft.setCursor(250 + (220 - tw) / 2, 190);
+        tft.setCursor(250 + (220 - tw) / 2 - x1, 190 - y1);
         tft.print(binStr);
     }
 }
@@ -270,7 +272,7 @@ void drawBrailleDots() {
         tft.setTextColor(act?C_WHITE:C_GRAY);
         int16_t x1,y1; uint16_t tw,th;
         tft.getTextBounds(String(i+1),0,0,&x1,&y1,&tw,&th);
-        tft.setCursor(cx-tw/2, cy-th/2 - y1);
+        tft.setCursor(cx - tw / 2 - x1, cy - th / 2 - y1);
         tft.print(i+1);
     }
 }
