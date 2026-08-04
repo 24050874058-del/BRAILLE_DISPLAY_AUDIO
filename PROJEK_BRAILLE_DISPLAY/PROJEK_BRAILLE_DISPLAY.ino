@@ -45,7 +45,7 @@ void eepromClearWiFi();
 void eepromSaveWiFi(const String &ssid, const String &pass, const String &user, bool isEnt);
 bool eepromLoadWiFi(String &ssid, String &pass, String &user, bool &isEnt);
 void eepromSaveSpeed();
-void speak(const String &text);
+void speak(const String &text, bool spell = false);
 void drawStatusBadge();
 void drawInputCardOnly();
 void drawOutputCardOnly();
@@ -55,6 +55,10 @@ String evalCalc(const String &expr);
 void drawGearIcon(int16_t cx, int16_t cy, int16_t r_out, int16_t r_in, uint16_t color);
 void drawWiFiIcon(int16_t cx, int16_t cy, uint16_t color);
 void drawWiFiIndicator();
+void initSolenoids();
+void setSolenoids(uint8_t pattern);
+void startSolenoidSpelling(const String &word);
+void updateSolenoidSpelling();
 
 // ============================================================
 // EEPROM DEFS
@@ -226,6 +230,7 @@ void setup() {
     
     // Audio
     initAudio();
+    initSolenoids();
     
     // MCP23017
     Wire.begin(SDA_PIN,SCL_PIN);
@@ -256,6 +261,7 @@ void setup() {
 }
 
 void loop() {
+    updateSolenoidSpelling();
     audio.loop();
     checkButtons();
     handleTouch();

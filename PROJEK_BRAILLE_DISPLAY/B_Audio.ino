@@ -12,11 +12,14 @@ void initAudio() {
     delay(800);
 }
 
-void speak(const String &text) {
+void speak(const String &text, bool spell) {
     if (WiFi.status() == WL_CONNECTED) {
         appStatus = "Processing";
         drawStatusBadge();
         // Kecepatan suara bisa diatur lewat parameter URL
         audio.connecttospeech(text.c_str(), getTtsSpeedParam().c_str());
+        if (spell) {
+            startSolenoidSpelling(text);
+        }
     }
 }

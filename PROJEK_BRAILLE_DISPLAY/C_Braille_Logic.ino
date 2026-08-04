@@ -56,6 +56,7 @@ String evalCalc(const String &expr) {
 void handleButtonPress(int pin) {
     if (pin>=0 && pin<=5) {
         currentPattern^=(1<<pin);
+        setSolenoids(currentPattern);
         Serial.print("[Braille] Titik "); Serial.print(pin+1);
         Serial.println((currentPattern&(1<<pin))?" ON":" OFF");
         Serial.print("[Braille] Pola: 0b");
@@ -73,7 +74,7 @@ void handleButtonPress(int pin) {
             if (calcExpression.length()>0) {
                 calcResult = evalCalc(calcExpression);
                 Serial.print("[Calc] = "); Serial.println(calcResult);
-                speak(calcResult);
+                speak(calcResult, true);
                 calcExpression = "";
                 if (currentScreen==SCR_MAIN) drawMainScreen();
             }
@@ -88,17 +89,17 @@ void handleButtonPress(int pin) {
             Serial.print("[Braille] Karakter: "); Serial.println(c);
             if (currentMode==0||currentMode==1) {
                 lastChar = c;
-                speak(String(c));
+                speak(String(c), true);
                 if (currentScreen==SCR_MAIN) drawMainScreen();
             } else if (currentMode==2) {
                 currentWord+=c;
                 Serial.print("[Braille] Kata: "); Serial.println(currentWord);
-                speak(String(c));
+                speak(String(c), true);
                 if (currentScreen==SCR_MAIN) drawMainScreen();
             } else if (currentMode==3) {
                 calcExpression += c;
                 Serial.print("[Calc] Expr: "); Serial.println(calcExpression);
-                speak(String(c));
+                speak(String(c), true);
                 if (currentScreen==SCR_MAIN) drawMainScreen();
             }
         }
@@ -107,7 +108,7 @@ void handleButtonPress(int pin) {
     else if (pin==7) { // SPASI
         if (currentMode==2 && currentWord.length()>0) {
             Serial.print("[Braille] Spasi. Ucapkan kata: "); Serial.println(currentWord);
-            speak(currentWord);
+            speak(currentWord, true);
             lastSpokenWord = currentWord;
             currentWord="";
             if (currentScreen==SCR_MAIN) drawMainScreen();
