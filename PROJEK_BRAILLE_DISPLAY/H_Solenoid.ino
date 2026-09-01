@@ -19,6 +19,7 @@ void initSolenoids() {
     }
 }
 
+
 void setSolenoids(uint8_t pattern) {
     // Actuate solenoids based on 6-bit pattern (bit 0 = dot 1, ..., bit 5 = dot 6)
     for (int i = 0; i < 6; i++) {
@@ -29,6 +30,7 @@ void setSolenoids(uint8_t pattern) {
 uint8_t charToBraillePattern(char c) {
     c = tolower(c);
     switch(c) {
+
         case 'a': case '1': return 0b000001;
         case 'b': case '2': return 0b000011;
         case 'c': case '3': return 0b001001;
