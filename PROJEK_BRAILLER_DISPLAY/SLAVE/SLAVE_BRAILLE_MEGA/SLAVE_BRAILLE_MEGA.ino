@@ -1,23 +1,20 @@
 // ============================================================
-// SLAVE_BRAILLE_MEGA.ino
-// Arduino Mega 2560 sebagai Slave Controller Solenoid Braille
+// SLAVE_BRAILLE_NANO.ino
+// Arduino Nano sebagai Slave Controller Solenoid Braille
 // ============================================================
-// Peran: Menerima perintah dari Master (ESP32-S3) via Serial1
-// PIN SERIAL1: RX=D19, TX=D18
+// Peran: Menerima perintah dari Master (ESP32-S3) via SoftwareSerial
+// PIN SOFTWARE SERIAL: D10 (RX), D11 (TX)
 // ============================================================
 
-// PIN SOLENOID
-const byte solenoidPins[6] = {
-    2,  // Dot 1
-    3,  // Dot 2
-    4,  // Dot 3
-    5,  // Dot 4
-    6,  // Dot 5
-    7   // Dot 6
-};
+#include <SoftwareSerial.h>
+
+// PIN SOLENOID (Dot 1 s/d Dot 6)
+const byte solenoidPins[6] = {2, 3, 4, 5, 6, 7};
 
 // SERIAL & TIMEOUT
-#define MASTER_SERIAL Serial1  // RX=D19, TX=D18
+// SoftwareSerial pada Pin D10 (RX) dan Pin D11 (TX)
+SoftwareSerial MASTER_SERIAL(10, 11); 
+
 #define BAUD_RATE 9600
 #define WATCHDOG_TIMEOUT 5000  // 5 detik tanpa komunikasi -> matikan solenoid
 
@@ -30,29 +27,29 @@ void allSolenoidsOff();
 void applyPattern(const byte pattern[6]);
 
 void setup() {
-    // Debug port (USB) - monitor di komputer
+    // Debug port (USB Serial Monitor Laptop)
     Serial.begin(115200);
     delay(200);
-    Serial.println("=========================================");
-    Serial.println(" BRAILLE SLAVE CONTROLLER (Arduino Mega) ");
-    Serial.println("=========================================");
-    Serial.println("Baud Serial1: 9600");
-    Serial.println("Menunggu perintah dari Master...");
+    Serial.println(F("========================================="));
+    Serial.println(F(" BRAILLE SLAVE CONTROLLER (Arduino Nano) "));
+    Serial.println(F("========================================="));
+    Serial.println(F("Baud SoftwareSerial (D10/D11): 9600"));
+    Serial.println(F("Menunggu perintah dari Master..."));
 
     // Inisialisasi pin solenoid - semua OFF saat boot
     for (byte i = 0; i < 6; i++) {
         pinMode(solenoidPins[i], OUTPUT);
         digitalWrite(solenoidPins[i], LOW);
     }
-    Serial.println("Solenoid: OK (semua OFF)");
+    Serial.println(F("Solenoid: OK (semua OFF)"));
 
-    // Inisialisasi Serial1 ke Master
+    // Inisialisasi komunikasi ke ESP32-S3
     MASTER_SERIAL.begin(BAUD_RATE);
     delay(100);
 
     // Kirim sinyal Ready ke Master
     MASTER_SERIAL.print("RDY\n");
-    Serial.println("Terkirim: RDY ke Master");
+    Serial.println(F("Terkirim: RDY ke Master"));
 
     lastCommandTime = millis();
 }
@@ -63,19 +60,19 @@ void loop() {
         char c = (char)MASTER_SERIAL.read();
 
         // Echo byte masuk ke Serial Monitor untuk debug
-        Serial.print("[RAW] 0x");
+        Serial.print(F("[RAW] 0x"));
         Serial.print((byte)c, HEX);
-        Serial.print(" '");
+        Serial.print(F(" '"));
         if (c >= 32 && c < 127) Serial.print(c);
         else Serial.print('?');
-        Serial.println("'");
+        Serial.println(F("'"));
 
         if (c == '\n') {
             rxBuffer.trim();
             if (rxBuffer.length() > 0) {
-                Serial.print("[CMD] '");
+                Serial.print(F("[CMD] '"));
                 Serial.print(rxBuffer);
-                Serial.print("' len=");
+                Serial.print(F("' len="));
                 Serial.println(rxBuffer.length());
                 processCommand(rxBuffer);
             }
@@ -83,7 +80,7 @@ void loop() {
         } else if (c != '\r') {
             rxBuffer += c;
             if (rxBuffer.length() > 32) {
-                Serial.println("[WARN] Buffer overflow, reset.");
+                Serial.println(F("[WARN] Buffer overflow, reset."));
                 rxBuffer = "";
             }
         }
@@ -101,7 +98,7 @@ void loop() {
 
         if (anyOn) {
             allSolenoidsOff();
-            Serial.println("[Watchdog] Timeout! Mematikan semua solenoid.");
+            Serial.println(F("[Watchdog] Timeout! Mematikan semua solenoid."));
         }
 
         lastCommandTime = millis(); // Reset agar tidak terus print
@@ -113,18 +110,18 @@ void processCommand(const String& cmd) {
 
     if (cmd == "PING") {
         MASTER_SERIAL.print("PONG\n");
-        Serial.println("  -> PONG");
+        Serial.println(F("  -> PONG"));
         return;
     }
 
     if (cmd == "OFF") {
         allSolenoidsOff();
         MASTER_SERIAL.print("ACK\n");
-        Serial.println("  -> ACK (Solenoid Mati)");
+        Serial.println(F("  -> ACK (Solenoid Mati)"));
         return;
     }
 
-    // Format BS:PPPPPP - minimal 9 karakter (>= bukan == agar trim tidak menyebabkan gagal)
+    // Format BS:PPPPPP
     if (cmd.startsWith("BS:") && cmd.length() >= 9) {
         bool valid = true;
         byte pattern[6] = {0};
@@ -137,9 +134,9 @@ void processCommand(const String& cmd) {
                 pattern[i] = 0;
             } else {
                 valid = false;
-                Serial.print("  -> Invalid char at pos ");
+                Serial.print(F("  -> Invalid char at pos "));
                 Serial.print(3 + i);
-                Serial.print(": 0x");
+                Serial.print(F(": 0x"));
                 Serial.println((byte)p, HEX);
                 break;
             }
@@ -148,36 +145,36 @@ void processCommand(const String& cmd) {
         if (valid) {
             applyPattern(pattern);
             MASTER_SERIAL.print("ACK\n");
-            Serial.print("  -> ACK (Pola: ");
+            Serial.print(F("  -> ACK (Pola: "));
             for (int i = 0; i < 6; i++) Serial.print(pattern[i]);
-            Serial.println(")");
+            Serial.println(F(")"));
         } else {
             MASTER_SERIAL.print("ERR:INV\n");
-            Serial.println("  -> ERR:INV");
+            Serial.println(F("  -> ERR:INV"));
         }
         return;
     }
 
     if (cmd.startsWith("TM:")) {
         MASTER_SERIAL.print("ACK\n");
-        Serial.print("  -> ACK (Timing: ");
+        Serial.print(F("  -> ACK (Timing: "));
         Serial.print(cmd);
-        Serial.println(")");
+        Serial.println(F(")"));
         return;
     }
 
     // Perintah tidak dikenal
     MASTER_SERIAL.print("ERR:INV\n");
-    Serial.print("  -> ERR:INV (Unknown: '");
+    Serial.print(F("  -> ERR:INV (Unknown: '"));
     Serial.print(cmd);
-    Serial.println("')");
+    Serial.println(F("')"));
 }
 
 void allSolenoidsOff() {
     for (byte i = 0; i < 6; i++) {
         digitalWrite(solenoidPins[i], LOW);
     }
-    Serial.println("[Solenoid] Semua OFF");
+    Serial.println(F("[Solenoid] Semua OFF"));
 }
 
 void applyPattern(const byte pattern[6]) {

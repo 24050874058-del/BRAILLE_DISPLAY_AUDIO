@@ -250,7 +250,7 @@ void setup() {
     // MCP23017
     Wire.begin(SDA_PIN,SCL_PIN);
     if (mcp1.begin_I2C(0x20)) {
-        for (int i=0;i<16;i++) mcp1.pinMode(i,INPUT_PULLUP);
+        for (int i=0;i<buaknya m16;i++) mcp1.pinMode(i,INPUT_PULLUP);
         Serial.println("[MCP23017] OK");
     } else {
         Serial.println("[MCP23017] ERROR - Cek I2C!");
@@ -273,6 +273,9 @@ void setup() {
     Serial.println(" @     = Tampilkan status lengkap");
     Serial.println(" !     = Tes suara TTS");
     Serial.println("================================\n");
+
+    
+    
 }
 
 void loop() {
