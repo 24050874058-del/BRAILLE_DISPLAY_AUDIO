@@ -1,6 +1,9 @@
 // ============================================================
-// SLAVE_BRAILLE_NANO.ino (Relay Active LOW Version)
+// SLAVE_BRAILLE_NANO.ino
 // Arduino Nano sebagai Slave Controller Solenoid Braille
+// ============================================================
+// Peran: Menerima perintah dari Master (ESP32-S3) via SoftwareSerial
+// PIN SOFTWARE SERIAL: D10 (RX), D11 (TX)
 // ============================================================
 
 #include <SoftwareSerial.h>
@@ -9,6 +12,7 @@
 const byte solenoidPins[6] = {2, 3, 4, 5, 6, 7};
 
 // SERIAL & TIMEOUT
+// SoftwareSerial pada Pin D10 (RX) dan Pin D11 (TX)
 SoftwareSerial MASTER_SERIAL(10, 11); 
 
 #define BAUD_RATE 9600
@@ -32,12 +36,12 @@ void setup() {
     Serial.println(F("Baud SoftwareSerial (D10/D11): 9600"));
     Serial.println(F("Menunggu perintah dari Master..."));
 
-    // Inisialisasi pin relay - HIGH berarti OFF untuk relay Active LOW
+    // Inisialisasi pin solenoid - semua OFF saat boot
     for (byte i = 0; i < 6; i++) {
         pinMode(solenoidPins[i], OUTPUT);
-        digitalWrite(solenoidPins[i], HIGH);
+        digitalWrite(solenoidPins[i], LOW);
     }
-    Serial.println(F("Solenoid (Relay): OK (semua OFF)"));
+    Serial.println(F("Solenoid: OK (semua OFF)"));
 
     // Inisialisasi komunikasi ke ESP32-S3
     MASTER_SERIAL.begin(BAUD_RATE);
@@ -82,12 +86,11 @@ void loop() {
         }
     }
 
-    // Watchdog Timer: jika 5 detik tidak ada perintah, matikan relay
+    // Watchdog Timer: jika 5 detik tidak ada perintah, matikan solenoid
     if (millis() - lastCommandTime >= WATCHDOG_TIMEOUT) {
         bool anyOn = false;
         for (byte i = 0; i < 6; i++) {
-            // Pada Relay Active LOW, pin berlogika LOW menandakan relay sedang aktif (ON)
-            if (digitalRead(solenoidPins[i]) == LOW) {
+            if (digitalRead(solenoidPins[i]) == HIGH) {
                 anyOn = true;
                 break;
             }
@@ -169,15 +172,13 @@ void processCommand(const String& cmd) {
 
 void allSolenoidsOff() {
     for (byte i = 0; i < 6; i++) {
-        digitalWrite(solenoidPins[i], HIGH); // HIGH = Relay OFF
+        digitalWrite(solenoidPins[i], LOW);
     }
     Serial.println(F("[Solenoid] Semua OFF"));
 }
 
 void applyPattern(const byte pattern[6]) {
     for (byte i = 0; i < 6; i++) {
-        // pattern 1 -> LOW (Relay ON)
-        // pattern 0 -> HIGH (Relay OFF)
-        digitalWrite(solenoidPins[i], pattern[i] ? LOW : HIGH);
+        digitalWrite(solenoidPins[i], pattern[i] ? HIGH : LOW);
     }
 }
